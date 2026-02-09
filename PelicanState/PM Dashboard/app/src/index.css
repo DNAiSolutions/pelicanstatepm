@@ -1,0 +1,55 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-neutral-200;
+  }
+  
+  body {
+    @apply bg-neutral-50 text-neutral-900 font-sans antialiased;
+    margin: 0;
+    min-height: 100vh;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold text-neutral-900;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white shadow-card border border-neutral-100;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-500 hover:bg-primary-600 text-white font-medium px-4 py-2 transition-colors duration-200 shadow-sm;
+  }
+  
+  .btn-secondary {
+    @apply bg-white hover:bg-neutral-50 text-neutral-700 font-medium px-4 py-2 border border-neutral-200 transition-colors duration-200;
+  }
+  
+  .status-chip {
+    @apply inline-flex items-center px-2.5 py-0.5 text-xs font-medium border;
+  }
+  
+  .status-approved {
+    @apply bg-green-50 text-green-700 border-green-200;
+  }
+  
+  .status-pending {
+    @apply bg-amber-50 text-amber-700 border-amber-200;
+  }
+  
+  .status-blocked {
+    @apply bg-red-50 text-red-700 border-red-200;
+  }
+  
+  .status-in-progress {
+    @apply bg-blue-50 text-blue-700 border-blue-200;
+  }
+}

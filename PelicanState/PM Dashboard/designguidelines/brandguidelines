@@ -1,0 +1,39 @@
+Theme
+☀️ Light
+Images
+Logo
+Favicon
+OG Image
+Components
+Buttons
+Primary
+Secondary
+Colors
+Primary:
+#143352
+Accent:
+#143352
+Background:
+#FFFFFF
+Text Primary:
+#1F2933
+Link:
+#1F2933
+Fonts
+Inter(body)
+Poppins(heading)
+Typography
+primary: Inter
+heading: Poppins
+h1: 60px
+h2: 36px
+body: 20px
+Spacing
+Base Unit:
+4
+Border Radius:
+0px
+Personality
+Tone: professional
+Energy: medium
+Audience: homeowners in Baton Rouge, LA

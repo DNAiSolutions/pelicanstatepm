@@ -1,0 +1,154 @@
+🚀 PELICAN STATE PM DASHBOARD - GET STARTED GUIDE
+
+QUICK START (5 minutes)
+======================
+
+1. CREATE SUPABASE PROJECT
+   - Go to https://supabase.com
+   - Click "New Project"
+   - Choose US region
+   - Note your database password
+   - Wait 2 minutes for initialization
+
+2. GET YOUR CREDENTIALS
+   - Go to Project Settings → API
+   - Copy "Project URL" → VITE_SUPABASE_URL
+   - Copy "anon (public) key" → VITE_SUPABASE_ANON_KEY
+   - Open: /app/.env.local
+   - Add your credentials:
+     VITE_SUPABASE_URL=https://your-project.supabase.co
+     VITE_SUPABASE_ANON_KEY=your-key-here
+
+3. RUN DATABASE SCHEMA
+   - In Supabase, go to SQL Editor
+   - Click "New Query"
+   - Copy entire contents of: supabase/schema.sql
+   - Paste into editor
+   - Click "Run"
+   - Wait for completion (should see "Query succeeded")
+
+4. SET UP STORAGE
+   - In Supabase, go to Storage
+   - Click "Create new bucket"
+   - Name: historic-docs
+   - Check "public" checkbox
+   - Click "Create bucket"
+
+5. CREATE TEST USERS
+   - In Supabase, go to Authentication → Users
+   - Click "Add user"
+   - Email: owner@pelicanstate.org
+   - Password: TestPass123!
+   - Repeat for:
+     - developer@pelicanstate.org (Developer role)
+     - user@pelicanstate.org (User role)
+
+6. ASSIGN ROLES
+   - Go to SQL Editor
+   - Copy this SQL:
+
+   INSERT INTO users (id, email, role, full_name, campus_assigned)
+   SELECT id, email, 'Owner', 'Owner User', ARRAY(SELECT id FROM campuses)
+   FROM auth.users
+   WHERE email = 'owner@pelicanstate.org';
+
+   INSERT INTO users (id, email, role, full_name, campus_assigned)
+   SELECT id, email, 'Developer', 'Developer User', ARRAY(SELECT id FROM campuses)
+   FROM auth.users
+   WHERE email = 'developer@pelicanstate.org';
+
+   INSERT INTO users (id, email, role, full_name, campus_assigned)
+   SELECT id, email, 'User', 'Regular User', ARRAY(SELECT id FROM campuses WHERE name = 'Wallace')
+   FROM auth.users
+   WHERE email = 'user@pelicanstate.org';
+
+   - Click "Run"
+
+7. START DEV SERVER
+   cd /Users/dayshablount/.gemini/antigravity/brain/BLAST/PelicanState/PM\ Dashboard/app
+   npm run dev
+
+8. LOGIN
+   - Open http://localhost:5173
+   - Email: owner@pelicanstate.org
+   - Password: TestPass123!
+
+9. CREATE A WORK REQUEST
+   - Click "Create Work Request" button
+   - Fill in:
+     * Campus: Wallace
+     * Property: Historic Building A
+     * Historic Property: Check YES
+     * Category: Construction Project
+     * Description: Test project
+   - Click "Create Work Request"
+
+YOU'RE LIVE! 🎉
+
+
+FILES YOU NEED
+==============
+- supabase/schema.sql - Complete database setup
+- SUPABASE_SETUP.md - Detailed setup guide
+- IMPLEMENTATION_STATUS.md - What's built
+- .env.local - Your Supabase credentials
+
+FILES NOT NEEDED (yet)
+======================
+- EstimateBuilder.tsx - Coming next
+- InvoiceBuilder.tsx - Coming next
+- HistoricDocumentation.tsx - Coming next
+- Edge Functions for PDF - Coming next
+
+
+TROUBLESHOOTING
+===============
+
+Q: "Can't connect to Supabase"
+A: Check .env.local has correct URL and key. Make sure Supabase project is running.
+
+Q: "RLS Policy Error"
+A: Run schema.sql again. Check SQL Editor for error messages.
+
+Q: "Users don't exist"
+A: Run the user setup SQL from step 6 above.
+
+Q: "Build fails"
+A: Make sure you're in the app/ directory. Run: npm install
+
+Q: "Port 5173 is in use"
+A: Kill the process or use: npm run dev -- --port 3000
+
+
+FEATURES READY NOW
+==================
+✅ Authentication (email/password, 3 roles)
+✅ Login/logout
+✅ Protected routes
+✅ Dashboard with status cards
+✅ Create work requests with auto-save
+✅ Database schema complete
+✅ Multi-campus support
+✅ Historic property flag
+✅ Role-based access control (RLS)
+
+
+COMING NEXT
+===========
+⏳ Estimate builder
+⏳ Invoice builder with campus splitting
+⏳ Historic documentation upload
+⏳ PDF generation (invoices, estimates, reports)
+⏳ Email notifications
+⏳ Weekly progress updates
+⏳ Analytics dashboard
+
+
+NEED HELP?
+==========
+1. Check SUPABASE_SETUP.md for detailed instructions
+2. Check IMPLEMENTATION_STATUS.md for what's built
+3. Check the browser console for error messages
+4. Check Supabase error logs in the dashboard
+
+Good luck! 🚀

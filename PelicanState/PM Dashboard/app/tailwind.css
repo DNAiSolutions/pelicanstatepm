@@ -1,0 +1,27 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-primary-50: #F0F4F8;
+  --color-primary-100: #DFE7F0;
+  --color-primary-200: #BFCFE0;
+  --color-primary-300: #9FB7D0;
+  --color-primary-400: #7F9FC0;
+  --color-primary-500: #143352;
+  --color-primary-600: #0F1F2D;
+  --color-primary-700: #0B1620;
+  --color-primary-800: #050B11;
+  --color-primary-900: #000000;
+
+  /* Font Families */
+  --font-heading: Poppins, system-ui, sans-serif;
+  --font-body: Inter, system-ui, sans-serif;
+  --font-sans: Inter, system-ui, sans-serif;
+
+  /* Box Shadows */
+  --shadow-soft: 0 2px 8px rgb(0 0 0 / 0.04);
+  --shadow-card: 0 1px 3px rgb(0 0 0 / 0.05);
+
+  /* Border Radius - 0px per brand */
+  --radius: 0px;
+}
