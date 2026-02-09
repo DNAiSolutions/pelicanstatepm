@@ -7,8 +7,8 @@ import {
   BarChart3,
   Settings,
   Users,
-  ChevronLeft,
-  LogOut
+  LogOut,
+  Building2
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -19,7 +19,7 @@ interface SidebarProps {
   onToggleCollapse: () => void;
 }
 
-export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
+export function Sidebar({ isCollapsed }: SidebarProps) {
   const location = useLocation();
   const { signOut, user } = useAuth();
 
@@ -29,9 +29,6 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
     { path: '/estimates', label: 'Estimates', icon: FileText },
     { path: '/invoices', label: 'Invoices', icon: DollarSign },
     { path: '/schedules', label: 'Schedule', icon: Calendar },
-  ];
-
-  const otherItems = [
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
     { path: '/members', label: 'Members', icon: Users },
     { path: '/settings', label: 'Settings', icon: Settings },
@@ -46,37 +43,28 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
     }
   };
 
-  const isActive = (path: string) => location.pathname.startsWith(path);
+  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   return (
-    <aside className={`bg-white border-r border-neutral-200 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-      {/* Header */}
-      <div className="p-6 flex items-center justify-between border-b border-neutral-100">
-        <div className="flex items-center space-x-3">
-          <div className="w-10 h-10 bg-primary-500 flex items-center justify-center text-white font-bold font-heading">
-            P
+    <aside className={`bg-[#1F2933] flex flex-col transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
+      {/* Header / Logo */}
+      <div className="p-6 flex items-center border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-[#143352] flex items-center justify-center">
+            <Building2 className="w-6 h-6 text-white" />
           </div>
           {!isCollapsed && (
-            <span className="font-heading font-semibold text-neutral-900">PelicanState</span>
+            <div>
+              <span className="font-heading font-semibold text-white text-lg">Pelican</span>
+              <span className="font-heading font-medium text-white/70 text-lg ml-1">State</span>
+            </div>
           )}
         </div>
-        <button
-          onClick={onToggleCollapse}
-          className="p-1.5 hover:bg-neutral-100 transition-colors"
-          title={isCollapsed ? 'Expand' : 'Collapse'}
-        >
-          <ChevronLeft className={`w-5 h-5 text-neutral-500 transition-transform ${isCollapsed ? 'rotate-180' : ''}`} />
-        </button>
       </div>
 
-      {/* Main Menu */}
-      <div className="flex-1 overflow-y-auto py-4">
+      {/* Navigation */}
+      <div className="flex-1 overflow-y-auto py-6">
         <nav className="px-3 space-y-1">
-          <div className="px-3 mb-2">
-            {!isCollapsed && (
-              <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Main Menu</p>
-            )}
-          </div>
           {menuItems.map((item) => {
             const Icon = item.icon;
             const active = isActive(item.path);
@@ -84,40 +72,10 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
               <Link
                 key={item.path}
                 to={item.path}
-                className={`w-full flex items-center justify-between px-3 py-2.5 transition-all ${
+                className={`w-full flex items-center gap-3 px-4 py-3 transition-all ${
                   active
-                    ? 'bg-primary-500 text-white shadow-soft'
-                    : 'text-neutral-600 hover:bg-neutral-50'
-                }`}
-                title={isCollapsed ? item.label : undefined}
-              >
-                <div className="flex items-center space-x-3">
-                  <Icon className="w-5 h-5" />
-                  {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
-                </div>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Other Section */}
-        <nav className="px-3 space-y-1 mt-6">
-          <div className="px-3 mb-2">
-            {!isCollapsed && (
-              <p className="text-xs font-medium text-neutral-500 uppercase tracking-wider">Other</p>
-            )}
-          </div>
-          {otherItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.path);
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`w-full flex items-center space-x-3 px-3 py-2.5 transition-all ${
-                  active
-                    ? 'bg-primary-500 text-white'
-                    : 'text-neutral-600 hover:bg-neutral-50'
+                    ? 'bg-[#143352] text-white border-l-4 border-white'
+                    : 'text-white/70 hover:bg-white/10 hover:text-white'
                 }`}
                 title={isCollapsed ? item.label : undefined}
               >
@@ -130,21 +88,21 @@ export function Sidebar({ isCollapsed, onToggleCollapse }: SidebarProps) {
       </div>
 
       {/* User Profile & Sign Out */}
-      <div className="p-4 border-t border-neutral-100 space-y-3">
+      <div className="p-4 border-t border-white/10">
         {!isCollapsed && user && (
-          <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-primary-100 flex items-center justify-center text-primary-600 font-semibold text-sm">
+          <div className="flex items-center gap-3 mb-3 px-2">
+            <div className="w-10 h-10 bg-[#143352] flex items-center justify-center text-white font-semibold text-sm rounded-full">
               {user.email?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-neutral-900 truncate">{user.email}</p>
-              <p className="text-xs text-neutral-500">{user.role || 'User'}</p>
+              <p className="text-sm font-medium text-white truncate">{user.email}</p>
+              <p className="text-xs text-white/50">{user.role || 'User'}</p>
             </div>
           </div>
         )}
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center justify-center space-x-2 px-3 py-2 text-neutral-600 hover:bg-neutral-50 transition-all"
+          className="w-full flex items-center gap-3 px-4 py-3 text-white/70 hover:bg-white/10 hover:text-white transition-all"
           title={isCollapsed ? 'Sign Out' : undefined}
         >
           <LogOut className="w-5 h-5" />

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Mail, Lock, AlertCircle } from 'lucide-react';
+import { Mail, Lock, AlertCircle, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 export function LoginPage() {
@@ -23,8 +23,6 @@ export function LoginPage() {
       setIsLoading(true);
       await signIn(email, password);
       toast.success('Welcome back!');
-      
-      // Role-based redirect will happen in App.tsx
       navigate('/dashboard');
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
@@ -35,84 +33,105 @@ export function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary-50 to-neutral-50 flex items-center justify-center px-4">
-      <div className="w-full max-w-md">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary-500 mx-auto mb-4 flex items-center justify-center text-white text-2xl font-heading">
-            P
+    <div className="min-h-screen flex">
+      {/* Left Side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 bg-[#143352] flex-col justify-center items-center text-white p-12">
+        <div className="max-w-md">
+          <div className="w-20 h-20 bg-white/10 flex items-center justify-center mb-8">
+            <Building2 className="w-10 h-10" />
           </div>
-          <h1 className="text-3xl font-heading font-bold text-primary-900 mb-2">
-            Pelican State
-          </h1>
-          <p className="text-neutral-600">
-            Construction & Facilities Management
+          <h1 className="text-5xl font-heading font-bold mb-4">Pelican State</h1>
+          <p className="text-xl text-white/80 mb-6">Construction & Facilities Management</p>
+          <p className="text-white/60 leading-relaxed">
+            Streamline your construction projects, manage work requests, and track progress 
+            across multiple campuses with our comprehensive project management dashboard.
           </p>
         </div>
+      </div>
 
-        {/* Login Form */}
-        <form onSubmit={handleSubmit} className="bg-white border border-neutral-200 shadow-soft p-8 space-y-6">
-          {/* Email Field */}
-          <div>
-            <label htmlFor="email" className="block text-sm font-medium text-neutral-900 mb-2">
-              Email Address
-            </label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 w-5 h-5 text-neutral-400" />
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="latoya@pelicanstate.org"
-                className="w-full pl-10 pr-4 py-2 border border-neutral-300 bg-white text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
+      {/* Right Side - Login Form */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center bg-[#F8F9FA] p-6">
+        <div className="w-full max-w-md">
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center mb-8">
+            <div className="w-16 h-16 bg-[#143352] mx-auto mb-4 flex items-center justify-center">
+              <Building2 className="w-8 h-8 text-white" />
+            </div>
+            <h1 className="text-2xl font-heading font-bold text-[#1F2933]">Pelican State</h1>
+            <p className="text-neutral-500 text-sm">Construction & Facilities Management</p>
+          </div>
+
+          {/* Login Form */}
+          <div className="bg-white border border-neutral-200 p-8">
+            <h2 className="text-2xl font-heading font-semibold text-[#1F2933] mb-2">Welcome back</h2>
+            <p className="text-neutral-500 mb-6">Please sign in to your account</p>
+
+            <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Email Field */}
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-[#1F2933] mb-2">
+                  Email Address
+                </label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 w-5 h-5 text-neutral-400" />
+                  <input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="you@pelicanstate.org"
+                    className="w-full pl-10 pr-4 py-3 border border-neutral-200 bg-white text-[#1F2933] placeholder-neutral-400 focus:outline-none focus:border-[#143352] transition-colors"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              {/* Password Field */}
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-[#1F2933] mb-2">
+                  Password
+                </label>
+                <div className="relative">
+                  <Lock className="absolute left-3 top-3 w-5 h-5 text-neutral-400" />
+                  <input
+                    id="password"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Enter your password"
+                    className="w-full pl-10 pr-4 py-3 border border-neutral-200 bg-white text-[#1F2933] placeholder-neutral-400 focus:outline-none focus:border-[#143352] transition-colors"
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              {/* Submit Button */}
+              <button
+                type="submit"
                 disabled={isLoading}
-              />
+                className="w-full bg-[#143352] hover:bg-[#0F1F2D] text-white py-3 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isLoading ? 'Signing in...' : 'Sign In'}
+              </button>
+            </form>
+
+            {/* Help Text */}
+            <div className="mt-6 p-4 bg-blue-50 border border-blue-100">
+              <div className="flex gap-3">
+                <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-medium mb-1">Demo Access</p>
+                  <p className="text-blue-600">Use your registered email and password to access the dashboard.</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          {/* Password Field */}
-          <div>
-            <label htmlFor="password" className="block text-sm font-medium text-neutral-900 mb-2">
-              Password
-            </label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 w-5 h-5 text-neutral-400" />
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2 border border-neutral-300 bg-white text-neutral-900 placeholder-neutral-400 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all"
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          {/* Submit Button */}
-          <button
-            type="submit"
-            disabled={isLoading}
-            className="w-full btn-primary text-white py-3 font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {isLoading ? 'Signing in...' : 'Sign In'}
-          </button>
-
-          {/* Demo Credentials Notice */}
-          <div className="bg-blue-50 border border-blue-200 rounded p-3 text-sm text-blue-700 flex gap-2">
-            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="font-medium mb-1">Demo Credentials</p>
-              <p>After creating your Supabase project, use your registered email and password</p>
-            </div>
-          </div>
-        </form>
-
-        {/* Footer Info */}
-        <p className="text-center text-sm text-neutral-600 mt-6">
-          Part of the Pelican State facilities management system
-        </p>
+          {/* Footer */}
+          <p className="text-center text-sm text-neutral-500 mt-6">
+            Pelican State PM Dashboard v1.0
+          </p>
+        </div>
       </div>
     </div>
   );
