@@ -1,272 +1,369 @@
-import { useAuth } from '../context/AuthContext';
-import { 
-  Clock, 
-  AlertCircle, 
-  DollarSign, 
-  FileText,
-  TrendingUp,
-  TrendingDown,
-  Calendar,
-  ArrowUpRight
-} from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { useState } from 'react';
+import { Clock, Share2, MoreVertical, ChevronDown, Plus, Filter } from 'lucide-react';
+
+interface TimelineData {
+  startDate: string;
+  today: string;
+  endDate: string;
+  percentComplete: number;
+}
 
 export function DashboardPage() {
-  const { user } = useAuth();
+  const [completedFilter, setCompletedFilter] = useState(true);
 
-  const metricsCards = [
-    {
-      title: 'Approval Requests',
-      value: 3,
-      trend: '+12%',
-      trendUp: true,
-      color: 'bg-amber-500',
-      icon: AlertCircle,
-      link: '/work-requests'
-    },
-    {
-      title: 'Active Work Orders',
-      value: 5,
-      trend: '+26%',
-      trendUp: true,
-      color: 'bg-blue-500',
-      icon: Clock,
-      link: '/work-requests'
-    },
-    {
-      title: 'Blocked Items',
-      value: 1,
-      trend: '-8%',
-      trendUp: false,
-      color: 'bg-red-500',
-      icon: AlertCircle,
-      link: '/work-requests'
-    },
-    {
-      title: 'Invoices Pending',
-      value: 2,
-      trend: '+15%',
-      trendUp: true,
-      color: 'bg-green-500',
-      icon: DollarSign,
-      link: '/invoices'
-    },
+  // Mock data
+  const timelineData: TimelineData = {
+    startDate: '23/09/2024',
+    today: '12/10/2024',
+    endDate: '18/12/2024',
+    percentComplete: 60,
+  };
+
+
+
+  const analyticsMonths = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+  const projectHistory = [
+    { name: 'Walton Levine', role: 'UIUX Designer', client: 'Client', location: 'Seattle, Washington', project: 'Studio' },
+    { name: 'Merrill Conrad', role: 'Project Manager', client: 'Client', location: 'Austin, Texas', project: 'Kitchen' },
+    { name: 'Stuart Mcmillan', role: 'Marketing Director', client: 'Client', location: 'Miami, Florida', project: 'Bedroom' },
+    { name: 'Darron Burch', role: 'Operations Coordinator', client: 'Client', location: 'Atlanta, Georgia', project: 'Living Room' },
+    { name: 'Joy Larson', role: 'Financial Analyst', client: 'Client', location: 'Chicago, Illinois', project: 'Apartment' },
+    { name: 'Leila King', role: 'Account Manager', client: 'Client', location: 'Phoenix, Arizona', project: 'Studio' },
   ];
 
-  const recentActivity = [
-    { id: 1, title: 'HVAC Unit Replacement - Room 101', campus: 'Wallace', status: 'In Progress', date: '2 hours ago', type: 'work-request' },
-    { id: 2, title: 'Roof Repair - Building C', campus: 'Woodland', status: 'Pending Approval', date: '5 hours ago', type: 'estimate' },
-    { id: 3, title: 'Plumbing Work - Main Building', campus: 'Paris', status: 'Completed', date: '1 day ago', type: 'work-request' },
+  const assignments = [
+    { name: 'Build whole new floor in building', status: 'Completed', deadline: '25 Nov' },
+    { name: 'Water for Apartment 2', status: 'In Progress', deadline: '25 Nov' },
+    { name: 'Create new project for Floor 2. Apartment 3', status: 'In Progress', deadline: '25 Nov' },
+    { name: 'Construction inspection for Building C', status: 'In Progress', deadline: '25 Nov' },
   ];
 
   return (
-    <div className="space-y-6">
-      {/* Welcome Section */}
+    <div className="space-y-6 max-w-7xl">
+      {/* Page Header */}
+      <div className="flex items-start justify-between">
+        <div className="flex-1">
+          <div className="flex items-center gap-2">
+            <h2 className="text-2xl font-heading font-bold text-neutral-900">Project Design Studio</h2>
+            <svg className="w-5 h-5 text-neutral-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </div>
+          <p className="text-sm text-neutral-600 mt-1">Manage any type of construction project. Assign owners, set timeline and keep track…</p>
+        </div>
+        <div className="flex items-center gap-2 ml-4">
+          <button className="flex items-center gap-1 px-3 py-1.5 text-sm font-medium text-neutral-700 hover:bg-neutral-100 transition-colors">
+            <Share2 className="w-4 h-4" />
+            Shared
+          </button>
+          <button className="p-1.5 text-neutral-600 hover:bg-neutral-100 transition-colors">
+            <MoreVertical className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Controls Row */}
       <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-heading font-semibold text-[#1F2933]">
-            Welcome back, {user?.email?.split('@')[0]}
-          </h2>
-          <p className="text-neutral-500 mt-1">
-            Here's what's happening with your projects today
-          </p>
+        <div className="flex items-center gap-3">
+          <button className="flex items-center gap-2 bg-neutral-900 hover:bg-neutral-800 text-white px-4 py-2.5 text-sm font-medium transition-colors">
+            New Project
+            <ChevronDown className="w-4 h-4" />
+          </button>
+          <button className="flex items-center gap-2 bg-white border border-neutral-300 hover:bg-neutral-50 text-neutral-900 px-4 py-2.5 text-sm font-medium transition-colors">
+            <Plus className="w-4 h-4" />
+            Add Widget
+          </button>
+        </div>
+        <div className="flex items-center gap-3">
+          <button className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+            </svg>
+            Person
+          </button>
+          <button className="flex items-center gap-2 px-3 py-2 text-sm text-neutral-700 hover:bg-neutral-100 transition-colors">
+            <Filter className="w-4 h-4" />
+            Project Filter
+            <ChevronDown className="w-4 h-4" />
+          </button>
         </div>
       </div>
 
-      {/* Metrics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {metricsCards.map((card, index) => {
-          const Icon = card.icon;
-          const TrendIcon = card.trendUp ? TrendingUp : TrendingDown;
-          return (
-            <Link
-              key={index}
-              to={card.link}
-              className="bg-white p-6 border border-neutral-200 hover:shadow-lg transition-shadow group"
-            >
-              <div className="flex items-start justify-between mb-4">
-                <div className={`p-3 ${card.color} text-white`}>
-                  <Icon className="w-6 h-6" />
-                </div>
-                <div className={`flex items-center gap-1 text-sm font-medium ${card.trendUp ? 'text-green-600' : 'text-red-600'}`}>
-                  <TrendIcon className="w-4 h-4" />
-                  {card.trend}
-                </div>
-              </div>
-              <h3 className="text-sm font-medium text-neutral-500 mb-1">{card.title}</h3>
-              <p className="text-3xl font-heading font-bold text-[#1F2933]">{card.value}</p>
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Main Dashboard Content */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left Column - Recent Activity & Analytics */}
-        <div className="lg:col-span-2 space-y-6">
-          {/* Recent Activity */}
-          <div className="bg-white border border-neutral-200">
-            <div className="p-6 border-b border-neutral-100 flex items-center justify-between">
-              <h3 className="font-heading font-semibold text-lg text-[#1F2933]">Recent Activity</h3>
-              <Link to="/work-requests" className="text-sm text-[#143352] hover:underline flex items-center gap-1">
-                View All <ArrowUpRight className="w-4 h-4" />
-              </Link>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                {recentActivity.map((activity) => (
-                  <div key={activity.id} className="flex items-center justify-between p-4 border border-neutral-100 hover:border-neutral-200 transition-colors">
-                    <div className="flex items-start gap-4">
-                      <div className={`w-2 h-2 mt-2 rounded-full ${
-                        activity.status === 'In Progress' ? 'bg-blue-500' :
-                        activity.status === 'Pending Approval' ? 'bg-amber-500' :
-                        'bg-green-500'
-                      }`} />
-                      <div>
-                        <h4 className="font-medium text-[#1F2933]">{activity.title}</h4>
-                        <p className="text-sm text-neutral-500 mt-1">{activity.campus} Campus • {activity.date}</p>
-                      </div>
-                    </div>
-                    <span className={`px-3 py-1 text-xs font-medium ${
-                      activity.status === 'In Progress' ? 'bg-blue-50 text-blue-700' :
-                      activity.status === 'Pending Approval' ? 'bg-amber-50 text-amber-700' :
-                      'bg-green-50 text-green-700'
-                    }`}>
-                      {activity.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+      {/* Widget Grid */}
+      <div className="grid grid-cols-3 gap-6">
+        {/* Time Estimate Graph - Large Left */}
+        <div className="col-span-2 bg-white border border-neutral-200 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-base font-semibold text-neutral-900">Time Estimate Graph</h3>
+            <button className="p-1.5 text-neutral-600 hover:bg-neutral-100 transition-colors">
+              <Clock className="w-5 h-5" />
+            </button>
           </div>
-
-          {/* Project Stats */}
-          <div className="bg-white border border-neutral-200">
-            <div className="p-6 border-b border-neutral-100">
-              <h3 className="font-heading font-semibold text-lg text-[#1F2933]">Project Statistics</h3>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-3 gap-6 text-center">
-                <div>
-                  <div className="w-16 h-16 mx-auto mb-3 rounded-full border-4 border-[#143352] flex items-center justify-center">
-                    <span className="text-xl font-bold text-[#143352]">72%</span>
-                  </div>
-                  <p className="text-sm text-neutral-500">Completed</p>
-                  <p className="text-xs text-neutral-400 mt-1">26 projects</p>
-                </div>
-                <div>
-                  <div className="w-16 h-16 mx-auto mb-3 rounded-full border-4 border-amber-500 flex items-center justify-center">
-                    <span className="text-xl font-bold text-amber-600">35</span>
-                  </div>
-                  <p className="text-sm text-neutral-500">Delayed</p>
-                  <p className="text-xs text-neutral-400 mt-1">Requires attention</p>
-                </div>
-                <div>
-                  <div className="w-16 h-16 mx-auto mb-3 rounded-full border-4 border-blue-500 flex items-center justify-center">
-                    <span className="text-xl font-bold text-blue-600">8</span>
-                  </div>
-                  <p className="text-sm text-neutral-500">In Progress</p>
-                  <p className="text-xs text-neutral-400 mt-1">Active work</p>
-                </div>
+          
+          {/* Timeline Bar */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-3">
+              <div className="flex-1 h-10 bg-orange-500 flex items-center justify-center text-white font-semibold text-sm rounded">
+                60% Completed
               </div>
+              <div className="flex-1 h-10 bg-gradient-to-r from-orange-200 to-orange-100" style={{
+                backgroundImage: 'repeating-linear-gradient(45deg, transparent, transparent 10px, rgba(255,255,255,.3) 10px, rgba(255,255,255,.3) 20px)'
+              }}></div>
+            </div>
+            
+            {/* Date Labels */}
+            <div className="flex justify-between text-xs font-medium text-neutral-600 mb-2">
+              <span>Start Date</span>
+              <span className="absolute left-1/2 -translate-x-1/2 text-center">
+                <div>Today</div>
+                <div className="text-neutral-500">12/10/2024</div>
+              </span>
+              <span>End Due</span>
+            </div>
+            <div className="flex justify-between text-sm font-semibold text-neutral-900">
+              <span>{timelineData.startDate}</span>
+              <span>{timelineData.endDate}</span>
             </div>
           </div>
         </div>
 
-        {/* Right Column - Quick Stats & Team */}
+        {/* KPI Cards - Right Column */}
         <div className="space-y-6">
-          {/* Budget Overview */}
-          <div className="bg-white border border-neutral-200">
-            <div className="p-6 border-b border-neutral-100">
-              <h3 className="font-heading font-semibold text-lg text-[#1F2933]">Budget Overview</h3>
-            </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-neutral-500">Total Budget</span>
-                    <span className="font-semibold text-[#1F2933]">$1,000,000</span>
-                  </div>
-                  <div className="w-full bg-neutral-100 h-2">
-                    <div className="bg-[#143352] h-2" style={{ width: '65%' }}></div>
-                  </div>
-                  <p className="text-xs text-neutral-500 mt-1">$650,000 spent</p>
+          {/* Active Sales */}
+          <div className="bg-white border border-neutral-200 rounded-2xl p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <div className="inline-block px-2 py-1 bg-green-50 text-green-600 text-xs font-semibold rounded">
+                  +12%
                 </div>
-                
-                <div>
-                  <div className="flex justify-between text-sm mb-2">
-                    <span className="text-neutral-500">Timeline</span>
-                    <span className="font-semibold text-[#1F2933]">Oct 2023 - Jan 2026</span>
-                  </div>
-                  <div className="w-full bg-neutral-100 h-2">
-                    <div className="bg-green-500 h-2" style={{ width: '40%' }}></div>
-                  </div>
-                  <p className="text-xs text-neutral-500 mt-1">40% complete</p>
+              </div>
+              <button className="p-1 text-neutral-400 hover:text-neutral-600">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </button>
+            </div>
+            <h3 className="text-sm text-neutral-600 mb-2">Active Sales</h3>
+            <p className="text-3xl font-bold text-neutral-900 mb-1">$32,086</p>
+            <p className="text-xs text-neutral-500 mb-4">vs last month</p>
+            {/* Mini Bar Chart */}
+            <div className="flex items-end gap-1 h-12">
+              <div className="flex-1 bg-orange-500 rounded" style={{ height: '60%' }}></div>
+              <div className="flex-1 bg-orange-400 rounded" style={{ height: '40%' }}></div>
+              <div className="flex-1 bg-orange-300 rounded" style={{ height: '80%' }}></div>
+              <div className="flex-1 bg-orange-500 rounded" style={{ height: '50%' }}></div>
+            </div>
+          </div>
+
+          {/* Product Revenue */}
+          <div className="bg-white border border-neutral-200 rounded-2xl p-6">
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <div className="inline-block px-2 py-1 bg-green-50 text-green-600 text-xs font-semibold rounded">
+                  +26%
+                </div>
+              </div>
+              <button className="p-1 text-neutral-400 hover:text-neutral-600">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </button>
+            </div>
+            <h3 className="text-sm text-neutral-600 mb-2">Product Revenue</h3>
+            <p className="text-3xl font-bold text-neutral-900 mb-1">$18,327</p>
+            <p className="text-xs text-neutral-500 mb-4">vs last month</p>
+            {/* Donut Chart */}
+            <div className="flex items-center justify-center">
+              <div className="w-16 h-16 rounded-full border-8 border-orange-500 flex items-center justify-center relative"
+                style={{
+                  background: `conic-gradient(#F97316 0% 26%, #FED7AA 26% 100%)`,
+                  borderColor: 'transparent'
+                }}>
+                <div className="absolute w-8 h-8 bg-white rounded-full flex items-center justify-center">
+                  <span className="text-xs font-bold text-orange-500">26%</span>
                 </div>
               </div>
             </div>
           </div>
+        </div>
+      </div>
 
-          {/* Team Members */}
-          <div className="bg-white border border-neutral-200">
-            <div className="p-6 border-b border-neutral-100">
-              <h3 className="font-heading font-semibold text-lg text-[#1F2933]">Team Members</h3>
+      {/* Bottom Row */}
+      <div className="grid grid-cols-3 gap-6">
+        {/* Analytics History - Wide Left */}
+        <div className="col-span-2 bg-white border border-neutral-200 rounded-2xl p-6">
+          <div className="flex items-center justify-between mb-6">
+            <h3 className="text-base font-semibold text-neutral-900">Analytics History</h3>
+            <div className="flex items-center gap-2">
+              <button className="px-3 py-1.5 text-sm bg-neutral-100 text-neutral-700 hover:bg-neutral-200 transition-colors rounded-full">
+                This year
+                <ChevronDown className="w-3 h-3 inline ml-1" />
+              </button>
+              <button className="p-1.5 text-neutral-600 hover:bg-neutral-100 transition-colors">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                </svg>
+              </button>
+              <button className="p-1.5 text-neutral-600 hover:bg-neutral-100 transition-colors">
+                <MoreVertical className="w-4 h-4" />
+              </button>
             </div>
-            <div className="p-6">
-              <div className="space-y-4">
-                {[
-                  { name: 'Walton Levine', role: 'Project Manager', campus: 'Wallace' },
-                  { name: 'Merrill Conrad', role: 'Site Supervisor', campus: 'Woodland' },
-                  { name: 'Stuart McMillan', role: 'Contractor', campus: 'Paris' },
-                ].map((member, idx) => (
-                  <div key={idx} className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#143352] rounded-full flex items-center justify-center text-white font-semibold">
-                      {member.name.split(' ').map(n => n[0]).join('')}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-medium text-[#1F2933] text-sm">{member.name}</p>
-                      <p className="text-xs text-neutral-500">{member.role}</p>
-                    </div>
-                    <span className="text-xs text-[#143352] font-medium">{member.campus}</span>
+          </div>
+
+          {/* Dot Chart */}
+          <div className="h-56 flex flex-col justify-between">
+            <div className="flex justify-between text-xs text-neutral-600 px-2">
+              <span>60K</span>
+              <span>50K</span>
+              <span>40K</span>
+              <span>30K</span>
+              <span>20K</span>
+              <span>10K</span>
+              <span>0K</span>
+            </div>
+            
+            {/* Chart Area */}
+            <div className="flex-1 flex items-end justify-between px-2 gap-1 mb-4">
+              {[30, 40, 55, 60, 50, 45, 52, 58, 62, 55, 50, 48].map((height, idx) => (
+                <div key={idx} className="flex-1 flex flex-col items-center justify-end gap-1">
+                  {/* Back dots (faded) */}
+                  {Array(8).fill(0).map((_, i) => (
+                    <div key={`back-${i}`} className="w-2 h-2 rounded-full bg-orange-100"></div>
+                  ))}
+                  {/* Front dots */}
+                  {Array(Math.floor(height / 10)).fill(0).map((_, i) => (
+                    <div key={`front-${i}`} className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
+                  ))}
+                </div>
+              ))}
+            </div>
+
+            {/* X Axis Labels */}
+            <div className="flex justify-between text-xs text-neutral-600 px-2">
+              {analyticsMonths.map((month) => (
+                <span key={month}>{month}</span>
+              ))}
+            </div>
+          </div>
+
+          {/* Legend */}
+          <div className="mt-4 flex items-center justify-center gap-4 text-xs text-neutral-600">
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-orange-500"></div>
+              <span>Completed 85%</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-2.5 h-2.5 rounded-full bg-orange-100"></div>
+              <span>In Progress 15%</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Project History - Right Tall */}
+        <div className="bg-white border border-neutral-200 rounded-2xl p-6 flex flex-col">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-base font-semibold text-neutral-900">Project History</h3>
+          </div>
+
+          {/* Toggle Pills */}
+          <div className="flex gap-2 mb-4">
+            <button 
+              onClick={() => setCompletedFilter(true)}
+              className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+                completedFilter 
+                  ? 'bg-neutral-900 text-white' 
+                  : 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300'
+              }`}
+            >
+              Completed
+            </button>
+            <button 
+              onClick={() => setCompletedFilter(false)}
+              className={`px-3 py-1 text-xs font-semibold rounded-full transition-colors ${
+                !completedFilter 
+                  ? 'bg-neutral-900 text-white' 
+                  : 'bg-neutral-200 text-neutral-700 hover:bg-neutral-300'
+              }`}
+            >
+              Pending
+            </button>
+          </div>
+
+          {/* Column Headers */}
+          <div className="grid grid-cols-3 gap-2 text-xs font-semibold text-neutral-500 mb-2 px-2">
+            <span className="text-orange-600">Client</span>
+            <span className="text-orange-600">Location</span>
+            <span className="text-orange-600">Project</span>
+          </div>
+
+          {/* Project List */}
+          <div className="flex-1 overflow-y-auto space-y-1">
+            {projectHistory.map((project, idx) => (
+              <div key={idx} className="grid grid-cols-3 gap-2 px-2 py-2 hover:bg-neutral-50 transition-colors border-b border-neutral-100 last:border-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 bg-neutral-400 rounded-full flex-shrink-0"></div>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-neutral-900 truncate">{project.name}</p>
+                    <p className="text-xs text-neutral-500 truncate">{project.role}</p>
                   </div>
-                ))}
+                </div>
+                <p className="text-xs text-neutral-600 truncate">{project.location}</p>
+                <p className="text-xs text-neutral-600 truncate">{project.project}</p>
               </div>
-            </div>
+            ))}
           </div>
+        </div>
+      </div>
 
-          {/* Quick Actions */}
-          <div className="bg-[#143352] text-white p-6">
-            <h3 className="font-heading font-semibold text-lg mb-4">Quick Actions</h3>
-            <div className="space-y-2">
-              <Link 
-                to="/work-requests/new" 
-                className="block w-full text-left px-4 py-3 bg-white/10 hover:bg-white/20 transition-colors text-sm"
-              >
-                <span className="flex items-center gap-2">
-                  <FileText className="w-4 h-4" />
-                  New Work Request
-                </span>
-              </Link>
-              <Link 
-                to="/estimates" 
-                className="block w-full text-left px-4 py-3 bg-white/10 hover:bg-white/20 transition-colors text-sm"
-              >
-                <span className="flex items-center gap-2">
-                  <DollarSign className="w-4 h-4" />
-                  Create Estimate
-                </span>
-              </Link>
-              <Link 
-                to="/invoices" 
-                className="block w-full text-left px-4 py-3 bg-white/10 hover:bg-white/20 transition-colors text-sm"
-              >
-                <span className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Generate Invoice
-                </span>
-              </Link>
-            </div>
-          </div>
+      {/* My Assignments Table */}
+      <div className="bg-white border border-neutral-200 rounded-2xl p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h3 className="text-base font-semibold text-neutral-900">My Assignments</h3>
+          <button className="p-1.5 text-neutral-600 hover:bg-neutral-100 transition-colors">
+            <MoreVertical className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Table */}
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="border-b border-neutral-200">
+                <th className="text-left py-3 px-4 text-xs font-semibold text-neutral-600">
+                  Assignments Name
+                  <svg className="w-3 h-3 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m0 0l4 4" />
+                  </svg>
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-neutral-600">
+                  Working Status
+                  <svg className="w-3 h-3 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m0 0l4 4" />
+                  </svg>
+                </th>
+                <th className="text-left py-3 px-4 text-xs font-semibold text-neutral-600">
+                  Time Deadline
+                  <svg className="w-3 h-3 inline ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16V4m0 0L3 8m0 0l4 4" />
+                  </svg>
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {assignments.map((assignment, idx) => (
+                <tr key={idx} className="border-b border-neutral-100 hover:bg-neutral-50 transition-colors">
+                  <td className="py-3 px-4 text-sm text-neutral-900">{assignment.name}</td>
+                  <td className="py-3 px-4">
+                    <span className="inline-block px-2 py-1 bg-blue-50 text-blue-700 text-xs font-medium rounded">
+                      {assignment.status}
+                    </span>
+                  </td>
+                  <td className="py-3 px-4 text-sm text-neutral-600">{assignment.deadline}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
     </div>

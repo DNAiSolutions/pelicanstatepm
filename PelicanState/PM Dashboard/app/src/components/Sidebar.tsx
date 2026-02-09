@@ -1,14 +1,18 @@
 import { 
   LayoutDashboard, 
   FolderKanban, 
+  Building2,
   FileText, 
   DollarSign, 
   Calendar,
   BarChart3,
-  Settings,
+  Zap,
+  TrendingUp,
   Users,
   LogOut,
-  Building2
+  Info,
+  Settings,
+  ChevronRight
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -23,15 +27,20 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
   const location = useLocation();
   const { signOut, user } = useAuth();
 
-  const menuItems = [
+  const mainMenuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/work-requests', label: 'Work Requests', icon: FolderKanban },
-    { path: '/estimates', label: 'Estimates', icon: FileText },
-    { path: '/invoices', label: 'Invoices', icon: DollarSign },
+    { path: '/projects', label: 'Projects', icon: FolderKanban, badge: '28' },
+    { path: '/buildings', label: 'Buildings', icon: Building2 },
+    { path: '/estimates', label: 'Estimate', icon: FileText },
+    { path: '/billing', label: 'Billing', icon: DollarSign, badge: '14' },
     { path: '/schedules', label: 'Schedule', icon: Calendar },
+  ];
+
+  const otherMenuItems = [
     { path: '/analytics', label: 'Analytics', icon: BarChart3 },
+    { path: '/integrations', label: 'Integration', icon: Zap },
+    { path: '/performance', label: 'Performance', icon: TrendingUp },
     { path: '/members', label: 'Members', icon: Users },
-    { path: '/settings', label: 'Settings', icon: Settings },
   ];
 
   const handleSignOut = async () => {
@@ -46,67 +55,140 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
   const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(`${path}/`);
 
   return (
-    <aside className={`bg-[#1F2933] flex flex-col transition-all duration-300 ${isCollapsed ? 'w-20' : 'w-64'}`}>
-      {/* Header / Logo */}
-      <div className="p-6 flex items-center border-b border-white/10">
+    <aside className={`bg-white border border-neutral-200 flex flex-col transition-all duration-300 ${isCollapsed ? 'w-24' : 'w-64'}`} style={{ borderRadius: '20px', margin: '16px', marginRight: '0px', height: 'calc(100vh - 32px)' }}>
+      {/* Brand Block */}
+      <div className="p-6 border-b border-neutral-200">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-[#143352] flex items-center justify-center">
-            <Building2 className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 bg-neutral-900 flex items-center justify-center text-white font-bold text-sm rounded-full">
+            P
           </div>
           {!isCollapsed && (
             <div>
-              <span className="font-heading font-semibold text-white text-lg">Pelican</span>
-              <span className="font-heading font-medium text-white/70 text-lg ml-1">State</span>
+              <div className="font-heading font-bold text-neutral-900 text-sm">Pelican</div>
+              <div className="font-body text-xs text-neutral-500">Building Dreams</div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Navigation */}
-      <div className="flex-1 overflow-y-auto py-6">
-        <nav className="px-3 space-y-1">
-          {menuItems.map((item) => {
-            const Icon = item.icon;
-            const active = isActive(item.path);
-            return (
-              <Link
-                key={item.path}
-                to={item.path}
-                className={`w-full flex items-center gap-3 px-4 py-3 transition-all ${
-                  active
-                    ? 'bg-[#143352] text-white border-l-4 border-white'
-                    : 'text-white/70 hover:bg-white/10 hover:text-white'
-                }`}
-                title={isCollapsed ? item.label : undefined}
-              >
-                <Icon className="w-5 h-5" />
-                {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
-              </Link>
-            );
-          })}
+      {/* Main Menu Section */}
+      <div className="flex-1 overflow-y-auto">
+        <nav className="px-3 py-4">
+          {!isCollapsed && (
+            <div className="px-3 mb-4">
+              <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Main Menu</p>
+            </div>
+          )}
+          
+          <div className="space-y-1">
+            {mainMenuItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.path);
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 transition-all ${
+                    active
+                      ? 'bg-orange-500 text-white'
+                      : 'text-neutral-700 hover:bg-neutral-100'
+                  }`}
+                  title={isCollapsed ? item.label : undefined}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {!isCollapsed && (
+                    <div className="flex-1 flex items-center justify-between">
+                      <span className="font-medium text-sm">{item.label}</span>
+                      {item.badge && (
+                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
+                          active ? 'bg-white/20' : 'bg-orange-100 text-orange-700'
+                        }`}>
+                          {item.badge}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Other Section */}
+        <nav className="px-3 py-4 border-t border-neutral-200">
+          {!isCollapsed && (
+            <div className="px-3 mb-4">
+              <p className="text-xs font-semibold text-neutral-500 uppercase tracking-wider">Other</p>
+            </div>
+          )}
+          
+          <div className="space-y-1">
+            {otherMenuItems.map((item) => {
+              const Icon = item.icon;
+              const active = isActive(item.path);
+              return (
+                <Link
+                  key={item.path}
+                  to={item.path}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 transition-all ${
+                    active
+                      ? 'bg-orange-500 text-white'
+                      : 'text-neutral-700 hover:bg-neutral-100'
+                  }`}
+                  title={isCollapsed ? item.label : undefined}
+                >
+                  <Icon className="w-5 h-5 flex-shrink-0" />
+                  {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
+                </Link>
+              );
+            })}
+          </div>
+        </nav>
+
+        {/* Bottom Utilities */}
+        <nav className="px-3 py-4 border-t border-neutral-200">
+          <div className="space-y-1">
+            <Link
+              to="/information"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-neutral-700 hover:bg-neutral-100 transition-all"
+              title={isCollapsed ? 'Information' : undefined}
+            >
+              <Info className="w-5 h-5 flex-shrink-0" />
+              {!isCollapsed && <span className="font-medium text-sm">Information</span>}
+            </Link>
+            <Link
+              to="/settings"
+              className="w-full flex items-center gap-3 px-3 py-2.5 text-neutral-700 hover:bg-neutral-100 transition-all"
+              title={isCollapsed ? 'Settings' : undefined}
+            >
+              <Settings className="w-5 h-5 flex-shrink-0" />
+              {!isCollapsed && <span className="font-medium text-sm">Settings</span>}
+            </Link>
+          </div>
         </nav>
       </div>
 
-      {/* User Profile & Sign Out */}
-      <div className="p-4 border-t border-white/10">
+      {/* User Profile Block */}
+      <div className="p-4 border-t border-neutral-200">
         {!isCollapsed && user && (
-          <div className="flex items-center gap-3 mb-3 px-2">
-            <div className="w-10 h-10 bg-[#143352] flex items-center justify-center text-white font-semibold text-sm rounded-full">
+          <div className="flex items-center gap-3 mb-3">
+            <div className="w-10 h-10 bg-orange-500 flex items-center justify-center text-white font-semibold text-sm rounded-full flex-shrink-0">
               {user.email?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{user.email}</p>
-              <p className="text-xs text-white/50">{user.role || 'User'}</p>
+              <p className="text-sm font-semibold text-neutral-900 truncate">{user.email?.split('@')[0]}</p>
+              <p className="text-xs text-neutral-500 truncate">{user.email}</p>
             </div>
+            <ChevronRight className="w-4 h-4 text-neutral-400 flex-shrink-0" />
           </div>
         )}
         <button
           onClick={handleSignOut}
-          className="w-full flex items-center gap-3 px-4 py-3 text-white/70 hover:bg-white/10 hover:text-white transition-all"
+          className="w-full flex items-center gap-3 px-3 py-2 text-neutral-700 hover:bg-neutral-100 transition-all"
           title={isCollapsed ? 'Sign Out' : undefined}
         >
-          <LogOut className="w-5 h-5" />
-          {!isCollapsed && <span className="text-sm font-medium">Sign Out</span>}
+          <LogOut className="w-5 h-5 flex-shrink-0" />
+          {!isCollapsed && <span className="font-medium text-sm">Logout</span>}
         </button>
       </div>
     </aside>
