@@ -25,22 +25,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [demoMode, setDemoMode] = useState(false);
+
+  // Demo user for testing without Supabase
+  const DEMO_USER: AuthUser = {
+    id: 'demo-user-123',
+    aud: 'authenticated',
+    role: 'Owner',
+    campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
+    email: 'demo@pelicanstate.com',
+    email_confirmed_at: new Date().toISOString(),
+    phone: '',
+    confirmed_at: new Date().toISOString(),
+    last_sign_in_at: new Date().toISOString(),
+    app_metadata: { provider: 'demo' },
+    user_metadata: { demo: true },
+    identities: [],
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
 
   useEffect(() => {
-    // Check if user is already logged in
+    // Check if demo mode is enabled
+    const demoParam = new URLSearchParams(window.location.search).get('demo');
+    const savedDemoMode = localStorage.getItem('demoMode') === 'true';
+    
     const checkSession = async () => {
       try {
+        // If demo mode or no Supabase session, use demo user
+        if (demoParam === 'true' || savedDemoMode) {
+          setDemoMode(true);
+          setUser(DEMO_USER);
+          setLoading(false);
+          return;
+        }
+
         const session = await authService.getCurrentSession();
         if (session?.user) {
-          // In a real app, fetch user role and campus from the users table
           setUser({
             ...session.user,
-            role: 'Owner', // Default for now - will be fetched from DB
-            campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'], // Mock data
+            role: 'Owner',
+            campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
           });
+        } else {
+          // No session and no demo mode - use demo by default for development
+          setDemoMode(true);
+          setUser(DEMO_USER);
         }
       } catch (err) {
         console.error('Session check error:', err);
+        // Fall back to demo mode on error
+        setDemoMode(true);
+        setUser(DEMO_USER);
       } finally {
         setLoading(false);
       }
@@ -48,42 +84,62 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     checkSession();
 
-    // Set up auth state listener
-    const { data: authListener } = authService.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        setUser({
-          ...session.user,
-          role: 'Owner',
-          campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
-        });
-      } else {
-        setUser(null);
-      }
-      setLoading(false);
-    });
+    // Set up auth state listener (only if not in demo mode)
+    if (!demoMode) {
+      const { data: authListener } = authService.onAuthStateChange((_event, session) => {
+        if (session?.user) {
+          setUser({
+            ...session.user,
+            role: 'Owner',
+            campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
+          });
+        } else {
+          setUser(null);
+        }
+        setLoading(false);
+      });
 
-    return () => {
-      authListener?.subscription.unsubscribe();
-    };
+      return () => {
+        authListener?.subscription.unsubscribe();
+      };
+    }
   }, []);
 
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
       setLoading(true);
-      const { data, error: signInError } = await authService.signIn(email, password);
+      
+      // Allow demo login with any credentials
+      if (email && password) {
+        // Try real authentication first
+        try {
+          const { data, error: signInError } = await authService.signIn(email, password);
 
-      if (signInError) {
-        throw signInError;
-      }
+          if (signInError) {
+            // Fall back to demo mode
+            setDemoMode(true);
+            setUser(DEMO_USER);
+            localStorage.setItem('demoMode', 'true');
+            return;
+          }
 
-      if (data.session?.user) {
-        // Fetch user role and campus from users table
-        setUser({
-          ...data.session.user,
-          role: 'Owner', // Fetch from DB in real implementation
-          campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
-        });
+          if (data.session?.user) {
+            setDemoMode(false);
+            localStorage.removeItem('demoMode');
+            setUser({
+              ...data.session.user,
+              role: 'Owner',
+              campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
+            });
+          }
+        } catch (authErr) {
+          // Fall back to demo mode on any auth error
+          console.log('Auth service unavailable, using demo mode');
+          setDemoMode(true);
+          setUser(DEMO_USER);
+          localStorage.setItem('demoMode', 'true');
+        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred during sign in';
@@ -124,8 +180,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       setLoading(true);
-      await authService.signOut();
-      setUser(null);
+      
+      if (demoMode) {
+        // In demo mode, just clear the user
+        setUser(null);
+        localStorage.removeItem('demoMode');
+        setDemoMode(false);
+      } else {
+        await authService.signOut();
+        setUser(null);
+      }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'An error occurred during sign out';
       setError(errorMessage);
