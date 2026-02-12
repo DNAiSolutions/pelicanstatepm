@@ -1,0 +1,14 @@
+{
+  "projects": [
+    {
+      "src": "PelicanState/PM Dashboard/app",
+      "use": "@vercel/static-build",
+      "config": {
+        "distDir": "dist",
+        "framework": "vite"
+      }
+    }
+  ],
+  "buildCommand": "npm run build",
+  "framework": "vite"
+}
