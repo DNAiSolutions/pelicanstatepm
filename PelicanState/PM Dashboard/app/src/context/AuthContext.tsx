@@ -21,129 +21,100 @@ export interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// Demo user for testing without Supabase
+const DEMO_USER: AuthUser = {
+  id: 'demo-user-123',
+  aud: 'authenticated',
+  role: 'Owner',
+  campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
+  email: 'demo@pelicanstate.com',
+  email_confirmed_at: new Date().toISOString(),
+  phone: '',
+  confirmed_at: new Date().toISOString(),
+  last_sign_in_at: new Date().toISOString(),
+  app_metadata: { provider: 'demo' },
+  user_metadata: { demo: true },
+  identities: [],
+  created_at: new Date().toISOString(),
+  updated_at: new Date().toISOString(),
+};
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [demoMode, setDemoMode] = useState(false);
-
-  // Demo user for testing without Supabase
-  const DEMO_USER: AuthUser = {
-    id: 'demo-user-123',
-    aud: 'authenticated',
-    role: 'Owner',
-    campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
-    email: 'demo@pelicanstate.com',
-    email_confirmed_at: new Date().toISOString(),
-    phone: '',
-    confirmed_at: new Date().toISOString(),
-    last_sign_in_at: new Date().toISOString(),
-    app_metadata: { provider: 'demo' },
-    user_metadata: { demo: true },
-    identities: [],
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  };
 
   useEffect(() => {
-    // Check if demo mode is enabled
-    const demoParam = new URLSearchParams(window.location.search).get('demo');
-    const savedDemoMode = localStorage.getItem('demoMode') === 'true';
-    
-    const checkSession = async () => {
+    const initializeAuth = async () => {
       try {
-        // If demo mode or no Supabase session, use demo user
+        console.log('Initializing auth...');
+        
+        // Check if demo mode is enabled
+        const demoParam = new URLSearchParams(window.location.search).get('demo');
+        const savedDemoMode = localStorage.getItem('demoMode') === 'true';
+        
+        // If demo mode parameter or saved preference, use demo user
         if (demoParam === 'true' || savedDemoMode) {
-          setDemoMode(true);
+          console.log('Using demo mode (from parameter/localStorage)');
           setUser(DEMO_USER);
           setLoading(false);
           return;
         }
 
-        const session = await authService.getCurrentSession();
-        if (session?.user) {
-          setUser({
-            ...session.user,
-            role: 'Owner',
-            campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
-          });
-        } else {
-          // No session and no demo mode - use demo by default for development
-          setDemoMode(true);
-          setUser(DEMO_USER);
+        // Try to get existing session
+        try {
+          const session = await authService.getCurrentSession();
+          if (session?.user) {
+            console.log('Found existing session');
+            setUser({
+              ...session.user,
+              role: 'Owner',
+              campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
+            });
+            setLoading(false);
+            return;
+          }
+        } catch (sessionErr) {
+          console.warn('Session check failed, will use demo mode:', sessionErr);
         }
-      } catch (err) {
-        console.error('Session check error:', err);
-        // Fall back to demo mode on error
-        setDemoMode(true);
+
+        // No session found - use demo mode as fallback
+        console.log('No session found, using demo mode fallback');
         setUser(DEMO_USER);
-      } finally {
+        setLoading(false);
+
+      } catch (err) {
+        console.error('Auth initialization error:', err);
+        // Emergency fallback - always set demo user
+        setUser(DEMO_USER);
         setLoading(false);
       }
     };
 
-    checkSession();
+    initializeAuth();
+  }, []); // Empty dependency array - run once on mount
 
-    // Set up auth state listener (only if not in demo mode)
-    if (!demoMode) {
-      const { data: authListener } = authService.onAuthStateChange((_event, session) => {
-        if (session?.user) {
-          setUser({
-            ...session.user,
-            role: 'Owner',
-            campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
-          });
-        } else {
-          setUser(null);
-        }
-        setLoading(false);
-      });
-
-      return () => {
-        authListener?.subscription.unsubscribe();
-      };
-    }
-  }, []);
+  const isAuthenticated = user !== null;
 
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
       setLoading(true);
       
-      // Allow demo login with any credentials
-      if (email && password) {
-        // Try real authentication first
-        try {
-          const { data, error: signInError } = await authService.signIn(email, password);
-
-          if (signInError) {
-            // Fall back to demo mode
-            setDemoMode(true);
-            setUser(DEMO_USER);
-            localStorage.setItem('demoMode', 'true');
-            return;
-          }
-
-          if (data.session?.user) {
-            setDemoMode(false);
-            localStorage.removeItem('demoMode');
-            setUser({
-              ...data.session.user,
-              role: 'Owner',
-              campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
-            });
-          }
-        } catch (authErr) {
-          // Fall back to demo mode on any auth error
-          console.log('Auth service unavailable, using demo mode');
-          setDemoMode(true);
-          setUser(DEMO_USER);
-          localStorage.setItem('demoMode', 'true');
-        }
+      // Try real authentication first
+      const result = await authService.signIn(email, password);
+      if (!result.error && result.data?.user) {
+        setUser({
+          ...result.data.user,
+          role: 'Owner',
+          campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
+        });
+      } else {
+        throw new Error(result.error?.message || 'Failed to sign in');
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred during sign in';
-      setError(errorMessage);
+      const message = err instanceof Error ? err.message : 'Sign in failed';
+      setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -154,22 +125,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       setError(null);
       setLoading(true);
-      const { data, error: signUpError } = await authService.signUp(email, password);
-
-      if (signUpError) {
-        throw signUpError;
-      }
-
-      if (data.user) {
-        setUser({
-          ...data.user,
-          role: 'User',
-          campusAssigned: [],
-        });
-      }
+      const result = await authService.signUp(email, password);
+      if (result.error) throw result.error;
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred during sign up';
-      setError(errorMessage);
+      const message = err instanceof Error ? err.message : 'Sign up failed';
+      setError(message);
       throw err;
     } finally {
       setLoading(false);
@@ -179,23 +139,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signOut = async () => {
     try {
       setError(null);
-      setLoading(true);
-      
-      if (demoMode) {
-        // In demo mode, just clear the user
-        setUser(null);
-        localStorage.removeItem('demoMode');
-        setDemoMode(false);
-      } else {
-        await authService.signOut();
-        setUser(null);
-      }
+      await authService.signOut();
+      setUser(null);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An error occurred during sign out';
-      setError(errorMessage);
+      const message = err instanceof Error ? err.message : 'Sign out failed';
+      setError(message);
       throw err;
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -206,13 +155,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signIn,
     signUp,
     signOut,
-    isAuthenticated: !!user,
+    isAuthenticated,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
   if (context === undefined) {
     throw new Error('useAuth must be used within an AuthProvider');
