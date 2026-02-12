@@ -1,0 +1,6 @@
+{
+  "buildCommand": "cd 'PelicanState/PM Dashboard/app' && npm run build",
+  "outputDirectory": "PelicanState/PM Dashboard/app/dist",
+  "rootDirectory": ".",
+  "framework": "vite"
+}
