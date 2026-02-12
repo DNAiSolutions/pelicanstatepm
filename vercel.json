@@ -1,18 +1,12 @@
 {
-  "projects": {
-    "pelicanstate-pm": {
-      "rootDirectory": "PelicanState/PM Dashboard/app",
-      "buildCommand": "npm run build",
-      "outputDirectory": "dist",
-      "framework": "vite",
-      "installCommand": "npm install",
-      "rewrites": [
-        {
-          "source": "/(.*)",
-          "destination": "/index.html"
-        }
-      ]
+  "buildCommand": "cd \"PelicanState/PM Dashboard/app\" && npm install && npm run build",
+  "outputDirectory": "PelicanState/PM Dashboard/app/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
     }
-  }
+  ]
 }
 
