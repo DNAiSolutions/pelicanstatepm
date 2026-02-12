@@ -40,68 +40,15 @@ const DEMO_USER: AuthUser = {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Initialize with demo user immediately for instant load
+  const [user, setUser] = useState<AuthUser | null>(DEMO_USER);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const initializeAuth = async () => {
-      try {
-        console.log('Initializing auth...');
-        
-        // Check if demo mode is explicitly disabled
-        const noDemoParam = new URLSearchParams(window.location.search).get('nodemo');
-        
-        // Check if we have real Supabase credentials
-        const hasRealCredentials = import.meta.env.VITE_SUPABASE_URL && 
-                                   !import.meta.env.VITE_SUPABASE_URL.includes('dummy') &&
-                                   import.meta.env.VITE_SUPABASE_ANON_KEY &&
-                                   !import.meta.env.VITE_SUPABASE_ANON_KEY.includes('dummy');
-
-        // If no real credentials OR demo is not disabled, use demo mode immediately
-        if (!hasRealCredentials || noDemoParam !== 'true') {
-          console.log('Using demo mode (no real credentials or demo mode enabled)');
-          setUser(DEMO_USER);
-          setLoading(false);
-          return;
-        }
-
-        // Only try to check session if we have real credentials AND demo is explicitly disabled
-        console.log('Attempting to check for existing Supabase session...');
-        try {
-          const sessionPromise = authService.getCurrentSession();
-          const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session check timeout')), 2000)
-          );
-          
-          const session = await Promise.race([sessionPromise, timeoutPromise]) as any;
-          
-          if (session?.user) {
-            console.log('Found existing session');
-            setUser({
-              ...session.user,
-              role: 'Owner',
-              campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
-            });
-          } else {
-            console.log('No session found, using demo mode fallback');
-            setUser(DEMO_USER);
-          }
-        } catch (sessionErr) {
-          console.warn('Session check failed, using demo mode:', sessionErr);
-          setUser(DEMO_USER);
-        } finally {
-          setLoading(false);
-        }
-
-      } catch (err) {
-        console.error('Auth initialization error:', err);
-        setUser(DEMO_USER);
-        setLoading(false);
-      }
-    };
-
-    initializeAuth();
+    // Log that we're using demo mode
+    console.log('AuthProvider: Using demo mode for instant load');
+    console.log('Demo user:', DEMO_USER.email);
   }, []);
 
   const isAuthenticated = user !== null;
