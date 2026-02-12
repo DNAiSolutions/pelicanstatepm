@@ -1,27 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || 'https://dummy.supabase.co';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || 'dummy-key';
 
-// Allow graceful initialization - demo mode will handle missing credentials
-let supabase: ReturnType<typeof createClient> | null = null;
-let initError: string | null = null;
-
-if (supabaseUrl && supabaseAnonKey) {
-  supabase = createClient(supabaseUrl, supabaseAnonKey);
-} else {
-  initError = 'Missing Supabase environment variables - using demo mode fallback';
-  console.warn(initError);
-  // Create a dummy client that will fail gracefully in AuthContext
-  supabase = createClient('https://dummy.supabase.co', 'dummy-key');
+// Log if using dummy credentials
+if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_ANON_KEY) {
+  console.warn(
+    'Missing Supabase environment variables - will use demo mode fallback for authentication'
+  );
 }
 
-export { supabase, initError };
+export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Auth helper functions
 export const authService = {
   async signUp(email: string, password: string) {
-    if (!supabase) throw new Error('Supabase not initialized');
     return await supabase.auth.signUp({
       email,
       password,
@@ -29,7 +22,6 @@ export const authService = {
   },
 
   async signIn(email: string, password: string) {
-    if (!supabase) throw new Error('Supabase not initialized');
     return await supabase.auth.signInWithPassword({
       email,
       password,
@@ -37,26 +29,22 @@ export const authService = {
   },
 
   async signOut() {
-    if (!supabase) throw new Error('Supabase not initialized');
     return await supabase.auth.signOut();
   },
 
   async getCurrentSession() {
-    if (!supabase) throw new Error('Supabase not initialized');
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
     return data.session;
   },
 
   async getCurrentUser() {
-    if (!supabase) throw new Error('Supabase not initialized');
     const { data, error } = await supabase.auth.getUser();
     if (error) throw error;
     return data.user;
   },
 
   onAuthStateChange(callback: (event: string, session: any) => void) {
-    if (!supabase) throw new Error('Supabase not initialized');
     return supabase.auth.onAuthStateChange((event, session) => {
       callback(event, session);
     });
