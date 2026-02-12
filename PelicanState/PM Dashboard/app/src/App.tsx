@@ -26,6 +26,9 @@ function App() {
     <Router>
       <AuthProvider>
         <Routes>
+          {/* Test route - no protection */}
+          <Route path="/test" element={<div style={{padding: '20px', fontFamily: 'sans-serif'}}><h1>✅ App is working!</h1><p>Auth context loaded successfully.</p></div>} />
+          
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
 
