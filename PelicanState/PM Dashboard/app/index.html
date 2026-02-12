@@ -13,18 +13,7 @@
         background: white;
       }
       #root {
-        display: none;
-      }
-      #app-loaded {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        right: 0;
-        bottom: 0;
-        background: white;
-        padding: 40px;
-        z-index: 9999;
+        /* Let React manage the root */
       }
       .loading-screen {
         position: fixed;
@@ -37,6 +26,7 @@
         justify-content: center;
         background: #f5f5f5;
         font-family: system-ui;
+        z-index: 9999;
       }
       .loading-content {
         text-align: center;
@@ -59,33 +49,41 @@
       }
     </style>
     <script>
-      window.__reactError__ = null;
-      window.__reactLoaded__ = false;
-      console.log('[Page Init] Starting...');
+      window.__appReady__ = false;
+      window.__appError__ = null;
       
-      // Show success message when React mounts
+      // Called by App.tsx when React is ready
       window.__onAppReady__ = function() {
-        console.log('[App Ready] React mounted successfully');
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('app-loaded').style.display = 'block';
-        window.__reactLoaded__ = true;
-      };
-      
-      // Fallback error handler
-      window.__showReactError__ = function(msg) {
-        window.__reactError__ = msg;
-        console.error('[React Error]', msg);
-        document.getElementById('app-loaded').innerHTML = '<div style="color: red; white-space: pre-wrap; font-family: monospace;"><h2>React Error:</h2>' + msg + '</div>';
-        document.getElementById('loading').style.display = 'none';
-        document.getElementById('app-loaded').style.display = 'block';
-      };
-      
-      // Safety timeout - if React hasn't loaded in 5 seconds, show fallback
-      setTimeout(function() {
-        if (!window.__reactLoaded__ && !window.__reactError__) {
-          window.__showReactError__('App initialization took too long (>5s).\n\nCheck browser console for details.');
+        console.log('[App Ready] React has rendered successfully');
+        const loadingScreen = document.getElementById('loading');
+        if (loadingScreen) {
+          loadingScreen.style.display = 'none';
         }
-      }, 5000);
+        window.__appReady__ = true;
+      };
+      
+      // Error handler if React fails to load
+      window.__showReactError__ = function(msg) {
+        window.__appError__ = msg;
+        console.error('[React Error]', msg);
+        const root = document.getElementById('root');
+        if (root) {
+          root.innerHTML = '<div style="color: red; white-space: pre-wrap; font-family: monospace; padding: 20px;"><h2>React Error:</h2>' + String(msg) + '</div>';
+        }
+        const loadingScreen = document.getElementById('loading');
+        if (loadingScreen) {
+          loadingScreen.style.display = 'none';
+        }
+      };
+      
+      // Safety timeout - if React hasn't signaled ready in 10 seconds, show error
+      setTimeout(function() {
+        if (!window.__appReady__ && !window.__appError__) {
+          window.__showReactError__('React failed to initialize within 10 seconds.\n\nCheck browser console for error details.');
+        }
+      }, 10000);
+      
+      console.log('[Page Init] Loading application...');
     </script>
   </head>
   <body>
@@ -95,24 +93,21 @@
         <p>Loading application...</p>
       </div>
     </div>
-    <div id="app-loaded" style="display: none;">
-      <h1>✅ App is initializing...</h1>
-      <p>React has not yet rendered content. This is a sign something is wrong.</p>
-    </div>
     <div id="root"></div>
     <script type="module">
-      console.log('[React Init] Starting React module...');
+      console.log('[React Init] Starting React application');
       try {
-        import('./src/main.tsx').then(() => {
-          console.log('[React Init] Main module imported successfully');
-          window.__onAppReady__();
-        }).catch((err) => {
+        import('./src/main.tsx').catch((err) => {
           console.error('[React Init] Error importing main:', err);
-          window.__showReactError__(String(err));
+          if (typeof window !== 'undefined' && typeof window.__showReactError__ === 'function') {
+            window.__showReactError__(String(err));
+          }
         });
       } catch (err) {
         console.error('[React Init] Error starting module:', err);
-        window.__showReactError__(String(err));
+        if (typeof window !== 'undefined' && typeof window.__showReactError__ === 'function') {
+          window.__showReactError__(String(err));
+        }
       }
     </script>
   </body>
