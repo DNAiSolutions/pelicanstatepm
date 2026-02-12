@@ -90,6 +90,15 @@ export interface Contact {
   updatedAt: string;
 }
 
+export interface LeadIntakeMetadata {
+  templateId?: string;
+  templateName?: string;
+  planQuestions?: string[];
+  materialSummary?: string;
+  laborSummary?: string;
+  submittedBy?: string;
+}
+
 export interface Lead {
   id: string;
   companyName: string;
@@ -106,7 +115,29 @@ export interface Lead {
   contactIds: string[];
   createdAt: string;
   updatedAt: string;
+  intakeMetadata?: LeadIntakeMetadata;
 }
+
+export type WorkOrderCategory =
+  | 'Repair'
+  | 'PM'
+  | 'Event'
+  | 'Events'
+  | 'Remodel'
+  | 'Inspection'
+  | 'Construction'
+  | 'Electrical'
+  | 'Planning'
+  | 'Demolition'
+  | 'Closeout'
+  | 'General Contracting'
+  | 'Conservation'
+  | 'Mechanical'
+  | 'Interiors'
+  | 'Envelope'
+  | 'Civil'
+  | 'Plumbing'
+  | 'Structural';
 
 export interface WorkOrder {
   id: string;
@@ -117,7 +148,7 @@ export interface WorkOrder {
   description: string;
   locationDetail: string;
   priority: Priority;
-  category: 'Repair' | 'PM' | 'Event' | 'Remodel' | 'Inspection' | 'Construction' | 'Electrical' | 'Planning' | 'Demolition' | 'Closeout';
+  category: WorkOrderCategory;
   status: WorkOrderStatus;
   requestedById: string;
   requestedDate: string;

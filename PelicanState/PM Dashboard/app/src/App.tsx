@@ -29,7 +29,7 @@ function App() {
           {/* Public Routes */}
           <Route path="/login" element={<LoginPage />} />
 
-          {/* Protected Routes */}
+          {/* Protected Routes - with fallback */}
           <Route
             element={
               <ProtectedRoute>

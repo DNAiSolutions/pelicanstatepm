@@ -72,8 +72,16 @@ export function ProjectClientViewPage() {
         notes: `Portal request (${portalPlan.templateName}): ${requestForm.scope} ${requestForm.location}`,
         estimatedValue: 50000,
         campusId: project.campusId,
-        projectId: undefined,
+        projectId: project.id,
         contactIds: [],
+        intakeMetadata: {
+          templateId: requestForm.templateType,
+          templateName: portalPlan.templateName,
+          planQuestions: portalPlan.questions,
+          materialSummary: portalPlan.materials,
+          laborSummary: portalPlan.labor,
+          submittedBy: requestForm.contactName || project.clientName,
+        },
       });
       setRequestForm({ scope: '', location: '', contactName: '', email: '', phone: '', templateType: requestForm.templateType });
       toast.success('Request submitted');

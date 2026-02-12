@@ -1,8 +1,9 @@
 import {
   mockWorkOrders,
-  type WorkOrder,
-  type WorkOrderStatus,
   type Priority,
+  type WorkOrder,
+  type WorkOrderCategory,
+  type WorkOrderStatus,
 } from '../data/pipeline';
 
 const statusColumns: Record<WorkOrderStatus, 'todo' | 'inprogress' | 'done'> = {
@@ -31,14 +32,20 @@ export type TaskTemplate =
   | 'plumbing'
   | 'concrete';
 
+type WorkOrderMaterial = NonNullable<WorkOrder['materials']>[number];
+type WorkOrderLabor = NonNullable<WorkOrder['labor']>[number];
+
+export type TemplateMaterial = Omit<WorkOrderMaterial, 'unitCost'> & { unitCost?: number };
+export type TemplateLabor = Omit<WorkOrderLabor, 'rate'> & { rate?: number };
+
 export type TemplateTask = {
   title: string;
   description: string;
   status?: WorkOrderStatus;
   priority?: Priority;
-  category?: WorkOrder['category'];
-  materials?: Array<{ name: string; quantity: number; unit: string; unitCost?: number }>;
-  labor?: Array<{ role: string; hours: number; rate?: number }>;
+  category?: WorkOrderCategory;
+  materials?: TemplateMaterial[];
+  labor?: TemplateLabor[];
 };
 
 export type ProjectPlan = {
@@ -402,7 +409,21 @@ export const projectTaskService = {
     return mockWorkOrders.filter((task) => task.projectId === projectId);
   },
 
-  createTask(projectId: string, payload: Partial<WorkOrder>): WorkOrder {
+  createTask(
+    projectId: string,
+    payload: Partial<Omit<WorkOrder, 'materials' | 'labor'>> & {
+      materials?: TemplateMaterial[];
+      labor?: TemplateLabor[];
+    }
+  ): WorkOrder {
+    const normalizedMaterials: WorkOrderMaterial[] = (payload.materials || []).map((material) => ({
+      ...material,
+      unitCost: material.unitCost ?? 0,
+    }));
+    const normalizedLabor: WorkOrderLabor[] = (payload.labor || []).map((entry) => ({
+      ...entry,
+      rate: entry.rate ?? 0,
+    }));
     const newTask: WorkOrder = {
       id: `wo-${Date.now()}`,
       projectId,
@@ -421,8 +442,8 @@ export const projectTaskService = {
       completionPhotoUrls: [],
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      materials: payload.materials || [],
-      labor: payload.labor || [],
+      materials: normalizedMaterials,
+      labor: normalizedLabor,
       aiQuestions: payload.aiQuestions || [],
       aiMaterialSummary: payload.aiMaterialSummary,
       aiLaborSummary: payload.aiLaborSummary,

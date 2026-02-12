@@ -8,7 +8,8 @@ import {
   type Project,
 } from '../data/pipeline';
 import { projectService } from '../services/projectService';
-import { projectTaskService, type TaskTemplate } from '../services/projectTaskService';
+import { projectTaskService, type TaskTemplate, type TemplateTask, type TemplateMaterial, type TemplateLabor } from '../services/projectTaskService';
+import { retainerRateService } from '../services/retainerRateService';
 import {
   Search,
   Plus,
@@ -19,6 +20,8 @@ import {
   Loader2,
   ArrowRight,
   ChevronDown,
+  RefreshCcw,
+  Info,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
@@ -29,6 +32,21 @@ const formatCurrency = (value: number) =>
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(value);
+
+type PlanEditsState = {
+  questions: string[];
+  materials: string;
+  labor: string;
+  selectedTaskTitles: Set<string>;
+};
+
+const LABOR_RATE_DEFAULTS = {
+  'Manual Labor': 45,
+  'Project Management': 85,
+  'Construction Supervision': 95,
+} as const;
+
+type LaborRateKey = keyof typeof LABOR_RATE_DEFAULTS;
 
 export function ProjectOverviewPage() {
   const navigate = useNavigate();
@@ -57,6 +75,9 @@ export function ProjectOverviewPage() {
   });
   const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [autoCreateTasks, setAutoCreateTasks] = useState(true);
+  const [planVersion, setPlanVersion] = useState(0);
+  const [planEdits, setPlanEdits] = useState<PlanEditsState | null>(null);
+  const [laborRates, setLaborRates] = useState<Record<string, number>>(LABOR_RATE_DEFAULTS);
 
   useEffect(() => {
     async function loadProjects() {
@@ -107,12 +128,110 @@ export function ProjectOverviewPage() {
     }
   }, [form.clientMode, form.existingClient]);
 
+  useEffect(() => {
+    async function loadLaborRates() {
+      try {
+        const rates = await retainerRateService.getRetainerRates();
+        if (Array.isArray(rates)) {
+          const next: Record<string, number> = { ...LABOR_RATE_DEFAULTS };
+          rates.forEach((rate: any) => {
+            if (rate?.rate_type && typeof rate.hourly_rate === 'number') {
+              next[rate.rate_type as string] = rate.hourly_rate;
+            }
+          });
+          setLaborRates(next);
+        }
+      } catch (error) {
+        console.warn('Unable to load retainer rates, using defaults', error);
+      }
+    }
+    loadLaborRates();
+  }, []);
+
   const templateLibrary = useMemo(() => projectTaskService.getTemplateLibrary(), []);
+  const selectedTemplateMeta = useMemo(
+    () => templateLibrary.find((template) => template.id === form.templateType),
+    [templateLibrary, form.templateType]
+  );
 
   const projectPlan = useMemo(() => {
     if (!form.scopeNotes && !form.locationNotes && !form.templateType) return null;
     return projectTaskService.generateProjectPlan(form.templateType, `${form.scopeNotes} ${form.locationNotes}`.trim());
-  }, [form.templateType, form.scopeNotes, form.locationNotes]);
+  }, [form.templateType, form.scopeNotes, form.locationNotes, planVersion]);
+
+  useEffect(() => {
+    if (!projectPlan) {
+      setPlanEdits(null);
+      return;
+    }
+    setPlanEdits({
+      questions: projectPlan.questions,
+      materials: projectPlan.materials,
+      labor: projectPlan.labor,
+      selectedTaskTitles: new Set(projectPlan.tasks.map((task) => task.title)),
+    });
+  }, [projectPlan]);
+
+  const handleRegeneratePlan = () => setPlanVersion((prev) => prev + 1);
+
+  const handleQuestionsChange = (value: string) => {
+    setPlanEdits((prev) => (prev ? { ...prev, questions: value.split('\n') } : prev));
+  };
+
+  const handleSummaryChange = (key: 'materials' | 'labor', value: string) => {
+    setPlanEdits((prev) => (prev ? { ...prev, [key]: value } : prev));
+  };
+
+  const toggleTaskSelection = (taskTitle: string) => {
+    setPlanEdits((prev) => {
+      if (!prev) return prev;
+      const nextSelected = new Set(prev.selectedTaskTitles);
+      if (nextSelected.has(taskTitle)) {
+        nextSelected.delete(taskTitle);
+      } else {
+        nextSelected.add(taskTitle);
+      }
+      return { ...prev, selectedTaskTitles: nextSelected };
+    });
+  };
+
+  const mapRoleToRateKey = (role: string): LaborRateKey => {
+    const normalized = role.toLowerCase();
+    if (normalized.includes('project')) return 'Project Management';
+    if (normalized.includes('manual')) return 'Manual Labor';
+    return 'Construction Supervision';
+  };
+
+  const buildLaborForTask = (task: TemplateTask): TemplateLabor[] => {
+    const baseEntries = task.labor && task.labor.length > 0
+      ? task.labor
+      : [
+          { role: 'Project Management', hours: 6 },
+          { role: 'Manual Labor', hours: 12 },
+        ];
+    return baseEntries.map((entry) => {
+      const rateKey = mapRoleToRateKey(entry.role);
+      return {
+        ...entry,
+        rate: entry.rate ?? laborRates[rateKey] ?? LABOR_RATE_DEFAULTS[rateKey],
+      };
+    });
+  };
+
+  const buildMaterialsForTask = (task: TemplateTask, perTaskBudget: number): TemplateMaterial[] => {
+    if (task.materials && task.materials.length > 0) {
+      return task.materials;
+    }
+    const allowance = Math.max(750, Math.round(perTaskBudget * 0.35));
+    return [
+      {
+        name: `${task.title} materials`,
+        quantity: 1,
+        unit: 'lot',
+        unitCost: allowance,
+      },
+    ];
+  };
 
   const projectsToShow = useMemo(() => {
     return projects.filter((project) => {
@@ -170,7 +289,14 @@ export function ProjectOverviewPage() {
         ? mockContacts.find((c) => c.company === form.existingClient)?.phone || form.clientPhone
         : form.clientPhone;
       const plan = projectPlan;
+      const editedQuestions = planEdits?.questions?.map((question) => question.trim()).filter((question) => question.length > 0);
+      const planQuestions = editedQuestions && editedQuestions.length > 0 ? editedQuestions : plan?.questions || [];
+      const planMaterials = planEdits?.materials ?? plan?.materials ?? '';
+      const planLabor = planEdits?.labor ?? plan?.labor ?? '';
       const summary = plan ? `${plan.templateName}: ${plan.description}` : (form.scopeNotes || form.locationNotes || 'New client request');
+      const tasksToCreate = plan
+        ? (planEdits ? plan.tasks.filter((task) => planEdits.selectedTaskTitles.has(task.title)) : plan.tasks)
+        : [];
       const payload = {
         name: form.name,
         campusId: form.campusId,
@@ -194,22 +320,24 @@ export function ProjectOverviewPage() {
       if (form.leadId) await projectService.linkLead(project.id, form.leadId);
       if (form.contactId) await projectService.linkContact(project.id, form.contactId);
       if (autoCreateTasks && plan) {
-         plan.tasks.forEach((taskConfig) => {
-           projectTaskService.createTask(project.id, {
-             title: taskConfig.title,
-             description: taskConfig.description,
-             status: taskConfig.status || 'Requested',
-             priority: taskConfig.priority,
-             category: taskConfig.category || 'Planning',
-             siteId,
-             materials: taskConfig.materials?.map(m => ({ ...m, unitCost: m.unitCost ?? 0 })),
-             labor: taskConfig.labor?.map(l => ({ ...l, rate: l.rate ?? 0 })),
-             aiQuestions: plan.questions,
-             aiMaterialSummary: plan.materials,
-             aiLaborSummary: plan.labor,
-           });
-         });
-       }
+        const tasksCount = Math.max(tasksToCreate.length || plan.tasks.length, 1);
+        const budgetPerTask = form.totalBudget / tasksCount;
+        tasksToCreate.forEach((taskConfig) => {
+          projectTaskService.createTask(project.id, {
+            title: taskConfig.title,
+            description: taskConfig.description,
+            status: taskConfig.status || 'Requested',
+            priority: taskConfig.priority,
+            category: taskConfig.category || 'Planning',
+            siteId,
+            materials: buildMaterialsForTask(taskConfig, budgetPerTask),
+            labor: buildLaborForTask(taskConfig),
+            aiQuestions: planQuestions,
+            aiMaterialSummary: planMaterials,
+            aiLaborSummary: planLabor,
+          });
+        });
+      }
       setProjects((prev) => [...prev, project]);
       setSelectedProjectId(project.id);
       setShowModal(false);
@@ -584,35 +712,96 @@ export function ProjectOverviewPage() {
                   Auto-create tasks from AI plan
                 </label>
               </div>
-              {projectPlan && (
-                <div className="md:col-span-2 bg-neutral-50 border border-neutral-200 p-4 space-y-3 text-sm text-neutral-700">
-                  <div className="flex items-center justify-between">
+              {selectedTemplateMeta && (
+                <div className="md:col-span-2 bg-neutral-50 border border-dashed border-neutral-200 p-3 text-xs text-neutral-600 space-y-1">
+                  <p className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
+                    {selectedTemplateMeta.name}
+                    <span className="text-[10px] uppercase tracking-[0.3em] text-[#143352] bg-white border border-[#143352]/20 px-2 py-0.5">{selectedTemplateMeta.category}</span>
+                  </p>
+                  <p>{selectedTemplateMeta.description}</p>
+                  <p className="text-[11px] text-neutral-500">Cost guidance: {selectedTemplateMeta.costHeuristic}</p>
+                  <p className="text-[11px] text-neutral-500 flex items-center gap-1" title={selectedTemplateMeta.walkthroughQuestions.join(' • ')}>
+                    <Info className="w-3 h-3" />
+                    {selectedTemplateMeta.walkthroughQuestions.length} prep questions suggested
+                  </p>
+                </div>
+              )}
+              {projectPlan && planEdits && (
+                <div className="md:col-span-2 bg-neutral-50 border border-neutral-200 p-4 space-y-4 text-sm text-neutral-700">
+                  <div className="flex flex-wrap items-start justify-between gap-3">
                     <div>
-                      <p className="font-semibold text-neutral-900">{projectPlan.templateName}</p>
+                      <p className="font-semibold text-neutral-900 flex items-center gap-2">
+                        {projectPlan.templateName}
+                        {selectedTemplateMeta?.category && (
+                          <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-600 border border-neutral-200 px-2 py-0.5">{selectedTemplateMeta.category}</span>
+                        )}
+                      </p>
                       <p className="text-xs text-neutral-500">{projectPlan.description}</p>
+                      <p className="text-[11px] text-neutral-500 mt-1">{projectPlan.costHeuristic}</p>
                     </div>
-                    <span className="text-xs text-neutral-500">{projectPlan.costHeuristic}</span>
+                    <button type="button" onClick={handleRegeneratePlan} className="inline-flex items-center gap-2 text-xs text-[#143352] border border-[#143352] px-3 py-1 uppercase tracking-wide">
+                      <RefreshCcw className="w-3.5 h-3.5" /> Regenerate Plan
+                    </button>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-xs text-neutral-500 uppercase tracking-[0.2em] block">
+                      Field Questions (one per line)
+                      <textarea
+                        value={planEdits.questions.join('\n')}
+                        onChange={(e) => handleQuestionsChange(e.target.value)}
+                        className="mt-2 w-full border border-neutral-300 px-3 py-2 text-sm text-neutral-700"
+                        rows={4}
+                      />
+                    </label>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      <label className="text-xs text-neutral-500 uppercase tracking-[0.2em] block">
+                        Materials Guidance
+                        <textarea
+                          value={planEdits.materials}
+                          onChange={(e) => handleSummaryChange('materials', e.target.value)}
+                          className="mt-2 w-full border border-neutral-300 px-3 py-2 text-sm text-neutral-700"
+                          rows={3}
+                        />
+                      </label>
+                      <label className="text-xs text-neutral-500 uppercase tracking-[0.2em] block">
+                        Labor Guidance
+                        <textarea
+                          value={planEdits.labor}
+                          onChange={(e) => handleSummaryChange('labor', e.target.value)}
+                          className="mt-2 w-full border border-neutral-300 px-3 py-2 text-sm text-neutral-700"
+                          rows={3}
+                        />
+                      </label>
+                    </div>
                   </div>
                   <div>
-                    <p className="font-medium text-neutral-900">Questions</p>
-                    <ul className="list-disc list-inside space-y-1">
-                      {projectPlan.questions.map((question) => (
-                        <li key={question}>{question}</li>
-                      ))}
-                    </ul>
-                  </div>
-                  <p><span className="font-medium text-neutral-900">Materials:</span> {projectPlan.materials}</p>
-                  <p><span className="font-medium text-neutral-900">Labor:</span> {projectPlan.labor}</p>
-                  <div>
-                    <p className="font-medium text-neutral-900">Recommended Tasks</p>
-                    <ul className="space-y-2">
-                      {projectPlan.tasks.map((task) => (
-                        <li key={task.title} className="border border-neutral-200 p-2">
-                          <p className="font-semibold text-neutral-900">{task.title}</p>
-                          <p className="text-xs text-neutral-500">{task.description}</p>
-                        </li>
-                      ))}
-                    </ul>
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium text-neutral-900">Recommended Tasks</p>
+                      <p className="text-xs text-neutral-500">{planEdits.selectedTaskTitles.size} selected</p>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {projectPlan.tasks.map((task) => {
+                        const isChecked = planEdits.selectedTaskTitles.has(task.title);
+                        return (
+                          <label key={task.title} className={`flex items-start gap-3 border border-neutral-200 p-3 ${!isChecked ? 'opacity-60' : ''}`}>
+                            <input
+                              type="checkbox"
+                              className="mt-1"
+                              checked={isChecked}
+                              onChange={() => toggleTaskSelection(task.title)}
+                            />
+                            <div>
+                              <p className="font-semibold text-neutral-900 flex items-center gap-2">
+                                {task.title}
+                                {task.category && <span className="text-[10px] uppercase tracking-[0.3em] text-neutral-500 border border-neutral-200 px-1.5 py-0.5">{task.category}</span>}
+                              </p>
+                              <p className="text-xs text-neutral-500">{task.description}</p>
+                            </div>
+                          </label>
+                        );
+                      })}
+                    </div>
+                    {!autoCreateTasks && <p className="text-xs text-amber-600 mt-2">Tasks are staged but will only be created if you enable auto-create.</p>}
                   </div>
                 </div>
               )}
