@@ -1,7 +1,6 @@
 import { 
   LayoutDashboard, 
   FolderKanban, 
-  Building2,
   FileText, 
   DollarSign, 
   Calendar,
@@ -12,7 +11,11 @@ import {
   LogOut,
   Info,
   Settings,
-  ChevronRight
+  ChevronRight,
+  ClipboardList,
+  BookOpen,
+  Handshake,
+  UserCircle2
 } from 'lucide-react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -30,9 +33,12 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
   const mainMenuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { path: '/projects', label: 'Projects', icon: FolderKanban, badge: '28' },
-    { path: '/buildings', label: 'Buildings', icon: Building2 },
+    { path: '/leads', label: 'Leads', icon: Handshake },
+    { path: '/contacts', label: 'Contacts', icon: UserCircle2 },
     { path: '/estimates', label: 'Estimate', icon: FileText },
     { path: '/billing', label: 'Billing', icon: DollarSign, badge: '14' },
+    { path: '/walkthroughs', label: 'Walkthroughs', icon: ClipboardList },
+    { path: '/historic-documentation', label: 'Historic Docs', icon: BookOpen },
     { path: '/schedules', label: 'Schedule', icon: Calendar },
   ];
 
@@ -90,7 +96,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
                   to={item.path}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 transition-all ${
                     active
-                      ? 'bg-orange-500 text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                   title={isCollapsed ? item.label : undefined}
@@ -101,7 +107,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
                       <span className="font-medium text-sm">{item.label}</span>
                       {item.badge && (
                         <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
-                          active ? 'bg-white/20' : 'bg-orange-100 text-orange-700'
+                          active ? 'bg-white/20' : 'bg-primary-50 text-primary-700'
                         }`}>
                           {item.badge}
                         </span>
@@ -132,7 +138,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
                   to={item.path}
                   className={`w-full flex items-center gap-3 px-3 py-2.5 transition-all ${
                     active
-                      ? 'bg-orange-500 text-white'
+                      ? 'bg-primary-500 text-white'
                       : 'text-neutral-700 hover:bg-neutral-100'
                   }`}
                   title={isCollapsed ? item.label : undefined}
@@ -172,7 +178,7 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
       <div className="p-4 border-t border-neutral-200">
         {!isCollapsed && user && (
           <div className="flex items-center gap-3 mb-3">
-            <div className="w-10 h-10 bg-orange-500 flex items-center justify-center text-white font-semibold text-sm rounded-full flex-shrink-0">
+            <div className="w-10 h-10 bg-primary-500 flex items-center justify-center text-white font-semibold text-sm rounded-full flex-shrink-0">
               {user.email?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">

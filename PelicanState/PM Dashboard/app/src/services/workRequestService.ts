@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { WorkRequest } from '../types';
+import type { WorkRequest, Priority } from '../types';
 
 export const workRequestService = {
   // Get all work requests (with filters)
@@ -7,6 +7,8 @@ export const workRequestService = {
     status?: string;
     campus_id?: string;
     category?: string;
+    priority?: Priority;
+    is_historic?: boolean;
   }) {
     let query = supabase.from('work_requests').select('*');
 
@@ -18,6 +20,12 @@ export const workRequestService = {
     }
     if (filters?.category) {
       query = query.eq('category', filters.category);
+    }
+    if (filters?.priority) {
+      query = query.eq('priority', filters.priority);
+    }
+    if (filters?.is_historic !== undefined) {
+      query = query.eq('is_historic', filters.is_historic);
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
@@ -36,7 +44,7 @@ export const workRequestService = {
     return data;
   },
 
-  // Create new work request
+  // Create new work request with enhanced fields
   async createWorkRequest(workRequest: Omit<WorkRequest, 'id' | 'request_number' | 'created_at' | 'updated_at'>) {
     const { data, error } = await supabase
       .from('work_requests')
@@ -62,6 +70,21 @@ export const workRequestService = {
   // Update work request status
   async updateWorkRequestStatus(id: string, status: string) {
     return this.updateWorkRequest(id, { status } as any);
+  },
+
+  // Update work request priority
+  async updateWorkRequestPriority(id: string, priority: Priority) {
+    return this.updateWorkRequest(id, { priority });
+  },
+
+  // Add scope of work
+  async addScopeOfWork(id: string, scopeOfWork: string) {
+    return this.updateWorkRequest(id, { scope_of_work: scopeOfWork });
+  },
+
+  // Add inspection notes
+  async addInspectionNotes(id: string, inspectionNotes: string) {
+    return this.updateWorkRequest(id, { inspection_notes: inspectionNotes });
   },
 
   // Delete work request
@@ -103,6 +126,38 @@ export const workRequestService = {
     return counts;
   },
 
+  // Get work requests by priority
+  async getWorkRequestsByPriority(priority: Priority, campus_id?: string) {
+    let query = supabase
+      .from('work_requests')
+      .select('*')
+      .eq('priority', priority);
+    
+    if (campus_id) {
+      query = query.eq('campus_id', campus_id);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  // Get historic work requests
+  async getHistoricWorkRequests(campus_id?: string) {
+    let query = supabase
+      .from('work_requests')
+      .select('*')
+      .eq('is_historic', true);
+    
+    if (campus_id) {
+      query = query.eq('campus_id', campus_id);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
   // Get requests needing approval
   async getRequestsNeedingApproval() {
     const { data, error } = await supabase
@@ -132,6 +187,22 @@ export const workRequestService = {
       .select('*')
       .eq('status', 'Blocked')
       .order('created_at', { ascending: false });
+    if (error) throw error;
+    return data;
+  },
+
+  // Get critical priority items
+  async getCriticalItems(campus_id?: string) {
+    let query = supabase
+      .from('work_requests')
+      .select('*')
+      .eq('priority', 'Critical');
+    
+    if (campus_id) {
+      query = query.eq('campus_id', campus_id);
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
     return data;
   },

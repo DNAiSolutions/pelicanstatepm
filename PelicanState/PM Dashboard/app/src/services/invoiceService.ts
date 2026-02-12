@@ -1,24 +1,5 @@
 import { supabase } from './supabaseClient';
-
-export interface InvoiceLineItem {
-  description: string;
-  location: string;
-  amount: number;
-  work_request_id: string;
-}
-
-export interface Invoice {
-  id?: string;
-  invoice_number?: string;
-  work_request_ids: string[];
-  campus_id: string;
-  funding_source: string;
-  line_items: InvoiceLineItem[];
-  total_amount: number;
-  status: 'Draft' | 'Submitted' | 'Approved' | 'Paid';
-  notes?: string;
-  payment_method?: string;
-}
+import type { Invoice, InvoiceLineItem } from '../types';
 
 export const invoiceService = {
   // Get invoices
@@ -160,23 +141,24 @@ export const invoiceService = {
     return lineItems.reduce((sum, item) => sum + item.amount, 0);
   },
 
-  // Validate invoice
-  validateInvoice(invoice: Invoice): { valid: boolean; errors: string[] } {
-    const errors: string[] = [];
+   // Validate invoice with ENHANCED requirements
+   validateInvoice(invoice: Invoice): { valid: boolean; errors: string[] } {
+     const errors: string[] = [];
 
-    if (!invoice.campus_id) {
-      errors.push('Campus is required');
-    }
-    if (!invoice.funding_source || invoice.funding_source.trim() === '') {
-      errors.push('Funding source is required');
-    }
-    if (!invoice.line_items || invoice.line_items.length === 0) {
-      errors.push('At least one line item is required');
-    }
-    if (invoice.total_amount <= 0) {
-      errors.push('Total amount must be greater than 0');
-    }
+     if (!invoice.campus_id) {
+       errors.push('Campus is required');
+     }
+     if (!invoice.funding_source || invoice.funding_source.trim() === '') {
+       errors.push('Funding source is required');
+     }
+     if (!invoice.line_items || invoice.line_items.length === 0) {
+       errors.push('At least one line item is required');
+     }
+     if (invoice.total_amount <= 0) {
+       errors.push('Total amount must be greater than 0');
+     }
 
+     // Enhanced validation: check for detailed work description
     invoice.line_items?.forEach((item, index) => {
       if (!item.description || item.description.trim() === '') {
         errors.push(`Line item ${index + 1}: Description is required`);
@@ -184,26 +166,76 @@ export const invoiceService = {
       if (!item.location || item.location.trim() === '') {
         errors.push(`Line item ${index + 1}: Location is required`);
       }
-      if (!item.amount || item.amount <= 0) {
-        errors.push(`Line item ${index + 1}: Amount must be greater than 0`);
+      if (!item.work_performed_notes || item.work_performed_notes.trim() === '') {
+        errors.push(`Line item ${index + 1}: Work performed notes are REQUIRED (describe what work was actually done)`);
       }
-    });
+       if (!item.amount || item.amount <= 0) {
+         errors.push(`Line item ${index + 1}: Amount must be greater than 0`);
+       }
+       if (!item.rate || item.rate <= 0) {
+         errors.push(`Line item ${index + 1}: Rate must be greater than 0`);
+       }
+     });
 
-    return {
-      valid: errors.length === 0,
-      errors,
-    };
-  },
+     return {
+       valid: errors.length === 0,
+       errors,
+     };
+   },
 
-  // Get invoices by date range
-  async getInvoicesByDateRange(startDate: Date, endDate: Date) {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
-      .order('created_at', { ascending: false });
-    if (error) throw error;
-    return data;
-  },
+   // Get invoices by date range
+   async getInvoicesByDateRange(startDate: Date, endDate: Date) {
+     const { data, error } = await supabase
+       .from('invoices')
+       .select('*')
+       .gte('created_at', startDate.toISOString())
+       .lte('created_at', endDate.toISOString())
+       .order('created_at', { ascending: false });
+     if (error) throw error;
+     return data;
+   },
+
+   // Get invoices by campus
+   async getInvoicesByCampus(campusId: string, filters?: {
+     status?: string;
+     dateRange?: { start: Date; end: Date };
+   }) {
+     let query = supabase
+       .from('invoices')
+       .select('*')
+       .eq('campus_id', campusId);
+
+     if (filters?.status) {
+       query = query.eq('status', filters.status);
+     }
+
+     if (filters?.dateRange) {
+       query = query
+         .gte('created_at', filters.dateRange.start.toISOString())
+         .lte('created_at', filters.dateRange.end.toISOString());
+     }
+
+     const { data, error } = await query.order('created_at', { ascending: false });
+     if (error) throw error;
+     return data;
+   },
+
+   // Calculate total with detailed breakdown
+   calculateTotalWithBreakdown(lineItems: InvoiceLineItem[]): {
+     subtotal: number;
+     itemCount: number;
+     details: Array<{ description: string; amount: number }>;
+   } {
+     const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
+     const details = lineItems.map(item => ({
+       description: item.description,
+       amount: item.amount,
+     }));
+
+     return {
+       subtotal,
+       itemCount: lineItems.length,
+       details,
+     };
+   },
 };

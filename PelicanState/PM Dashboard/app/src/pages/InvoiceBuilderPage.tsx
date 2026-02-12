@@ -1,12 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { workRequestService } from '../services/workRequestService';
-import { invoiceService, type InvoiceLineItem } from '../services/invoiceService';
+import { invoiceService } from '../services/invoiceService';
 import { campusService, type Campus } from '../services/campusService';
 import { pdfService } from '../services/pdfService';
-import type { WorkRequest } from '../types';
-import { Plus, Trash2, AlertCircle, DollarSign, FileText, Download } from 'lucide-react';
+import type { WorkRequest, InvoiceLineItem } from '../types';
+import { AlertCircle, DollarSign, FileText, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { InvoiceDetailForm } from '../components/InvoiceDetailForm';
 
 export function InvoiceBuilderPage() {
   const navigate = useNavigate();
@@ -45,27 +46,64 @@ export function InvoiceBuilderPage() {
   const totalAmount = invoiceService.calculateTotal(lineItems);
   const selectedWorkRequests = workRequests.filter((wr) => selectedRequests.includes(wr.id));
   const campusesForInvoice = [...new Set(selectedWorkRequests.map((wr) => wr.campus_id))];
+  const workRequestLookup = new Map(workRequests.map((wr) => [wr.id, wr]));
 
   // Toggle work request selection
   const toggleWorkRequest = (requestId: string) => {
-    setSelectedRequests((prev) =>
-      prev.includes(requestId) ? prev.filter((id) => id !== requestId) : [...prev, requestId]
-    );
+    setSelectedRequests((prev) => {
+      const next = prev.includes(requestId)
+        ? prev.filter((id) => id !== requestId)
+        : [...prev, requestId];
+
+      setLineItems((items) => items.filter((item) => !item.work_request_id || next.includes(item.work_request_id)));
+      return next;
+    });
   };
 
   // Add line item
-  const addLineItem = () => {
-    setLineItems([
-      ...lineItems,
-      { description: '', location: '', amount: 0, work_request_id: selectedWorkRequests[0]?.id || '' },
+  const addLineItemForCampus = (campusId: string) => {
+    const campusRequests = selectedWorkRequests.filter((wr) => wr.campus_id === campusId);
+    if (campusRequests.length === 0) {
+      toast.error('Select a work request for this campus first');
+      return;
+    }
+
+    const defaultRequest = campusRequests[0];
+    setLineItems((current) => [
+      ...current,
+      {
+        description: '',
+        location: defaultRequest.property || '',
+        work_request_id: defaultRequest.id,
+        quantity: 1,
+        unit: 'hrs',
+        rate: 0,
+        amount: 0,
+        work_performed_notes: '',
+      },
     ]);
   };
 
   // Update line item
   const updateLineItem = (index: number, field: keyof InvoiceLineItem, value: any) => {
-    const updated = [...lineItems];
-    updated[index] = { ...updated[index], [field]: value };
-    setLineItems(updated);
+    setLineItems((current) => {
+      const updated = [...current];
+      const nextItem = { ...updated[index], [field]: value } as InvoiceLineItem;
+
+      if (field === 'work_request_id' && typeof value === 'string') {
+        const wr = workRequestLookup.get(value);
+        nextItem.location = wr?.property || '';
+      }
+
+      if (field === 'quantity' || field === 'rate') {
+        const qty = field === 'quantity' ? value : nextItem.quantity;
+        const rate = field === 'rate' ? value : nextItem.rate;
+        nextItem.amount = Number((qty || 0) * (rate || 0));
+      }
+
+      updated[index] = nextItem;
+      return updated;
+    });
   };
 
   // Remove line item
@@ -108,6 +146,16 @@ export function InvoiceBuilderPage() {
       newErrors.invoice = validation.errors.join('; ');
     }
 
+    campusesForInvoice.forEach((campusId) => {
+      const campusHasItems = lineItems.some((item) => {
+        const wr = workRequestLookup.get(item.work_request_id);
+        return wr?.campus_id === campusId;
+      });
+      if (!campusHasItems) {
+        newErrors.lineItems = `Add at least one line item for ${getCampusName(campusId)}`;
+      }
+    });
+
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -122,14 +170,19 @@ export function InvoiceBuilderPage() {
 
       const campusId = campusesForInvoice[0];
       const campusName = getCampusName(campusId);
+      const campusLineItems = lineItems.filter((item) => {
+        const wr = workRequestLookup.get(item.work_request_id);
+        return wr?.campus_id === campusId;
+      });
+      const campusTotal = invoiceService.calculateTotal(campusLineItems);
 
       await pdfService.generateInvoicePDF(
         {
           invoice_number: `INV-${new Date().getFullYear()}-PREVIEW`,
           campus_name: campusName,
           funding_source: getFundingSource(campusId),
-          line_items: lineItems,
-          total_amount: totalAmount,
+          line_items: campusLineItems,
+          total_amount: campusTotal,
         },
         `Invoice-Preview-${campusName}.pdf`
       );
@@ -280,105 +333,30 @@ export function InvoiceBuilderPage() {
         )}
 
         {/* Line Items */}
-        <div className="card p-8">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-2xl font-heading font-bold text-neutral-900">
-              Step 2: Line Items
-            </h2>
-            <button
-              type="button"
-              onClick={addLineItem}
-              disabled={selectedRequests.length === 0}
-              className="btn-primary inline-flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Plus className="w-5 h-5" />
-              Add Item
-            </button>
+        <div className="card p-8 space-y-6">
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h2 className="text-2xl font-heading font-bold text-neutral-900">
+                Step 2: Detailed Line Items
+              </h2>
+              <p className="text-sm text-neutral-600">Every line item must document what work happened, where, and for which campus.</p>
+            </div>
           </div>
 
-          {errors.lineItems && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 text-red-700 text-sm flex items-center gap-2">
-              <AlertCircle className="w-4 h-4" />
-              {errors.lineItems}
-            </div>
-          )}
-
-          {lineItems.length === 0 ? (
+          {selectedWorkRequests.length === 0 ? (
             <div className="text-center py-8 text-neutral-500">
-              <p>No line items yet. Select work requests and click "Add Item".</p>
+              <p>Select completed work requests to start building invoice details.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b-2 border-neutral-300">
-                  <tr>
-                    <th className="text-left py-3 px-4 font-medium text-neutral-900">Description</th>
-                    <th className="text-left py-3 px-4 font-medium text-neutral-900">Location</th>
-                    <th className="text-left py-3 px-4 font-medium text-neutral-900">Work Request</th>
-                    <th className="text-right py-3 px-4 font-medium text-neutral-900">Amount</th>
-                    <th className="text-center py-3 px-4 font-medium text-neutral-900">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="space-y-2">
-                  {lineItems.map((item, index) => (
-                    <tr key={index} className="border-b border-neutral-200">
-                      <td className="py-3 px-4">
-                        <input
-                          type="text"
-                          value={item.description}
-                          onChange={(e) => updateLineItem(index, 'description', e.target.value)}
-                          placeholder="Description of work"
-                          className="w-full px-2 py-1 border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        />
-                      </td>
-                      <td className="py-3 px-4">
-                        <input
-                          type="text"
-                          value={item.location}
-                          onChange={(e) => updateLineItem(index, 'location', e.target.value)}
-                          placeholder="Property/location"
-                          className="w-full px-2 py-1 border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        />
-                      </td>
-                      <td className="py-3 px-4">
-                        <select
-                          value={item.work_request_id}
-                          onChange={(e) => updateLineItem(index, 'work_request_id', e.target.value)}
-                          className="w-full px-2 py-1 border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                        >
-                          <option value="">Select...</option>
-                          {selectedWorkRequests.map((wr) => (
-                            <option key={wr.id} value={wr.id}>
-                              {wr.request_number}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="py-3 px-4">
-                        <input
-                          type="number"
-                          value={item.amount || ''}
-                          onChange={(e) => updateLineItem(index, 'amount', parseFloat(e.target.value) || 0)}
-                          placeholder="0.00"
-                          step="0.01"
-                          min="0"
-                          className="w-full px-2 py-1 border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-primary-500 text-right"
-                        />
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        <button
-                          type="button"
-                          onClick={() => removeLineItem(index)}
-                          className="text-red-600 hover:text-red-700 transition-colors"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+            <InvoiceDetailForm
+              campuses={campuses}
+              selectedWorkRequests={selectedWorkRequests}
+              lineItems={lineItems}
+              onAddItem={addLineItemForCampus}
+              onUpdateItem={updateLineItem}
+              onRemoveItem={removeLineItem}
+              errors={errors.lineItems || errors.invoice}
+            />
           )}
         </div>
 

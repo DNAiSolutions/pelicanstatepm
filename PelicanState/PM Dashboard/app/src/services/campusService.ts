@@ -1,11 +1,7 @@
 import { supabase } from './supabaseClient';
+import type { Campus as CampusType } from '../types';
 
-export interface Campus {
-  id: string;
-  name: string;
-  funding_source: string;
-  address?: string;
-}
+export type Campus = CampusType;
 
 export const campusService = {
   // Get all campuses
