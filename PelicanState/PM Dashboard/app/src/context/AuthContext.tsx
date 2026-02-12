@@ -49,37 +49,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       try {
         console.log('Initializing auth...');
         
-        // Check if demo mode is enabled via parameter or localStorage
-        const demoParam = new URLSearchParams(window.location.search).get('demo');
-        const savedDemoMode = localStorage.getItem('demoMode') === 'true';
+        // Check if demo mode is explicitly disabled
+        const noDemoParam = new URLSearchParams(window.location.search).get('nodemo');
         
-        if (demoParam === 'true' || savedDemoMode) {
-          console.log('Using demo mode (from parameter/localStorage)');
-          setUser(DEMO_USER);
-          setLoading(false);
-          return;
-        }
-
         // Check if we have real Supabase credentials
         const hasRealCredentials = import.meta.env.VITE_SUPABASE_URL && 
                                    !import.meta.env.VITE_SUPABASE_URL.includes('dummy') &&
                                    import.meta.env.VITE_SUPABASE_ANON_KEY &&
                                    !import.meta.env.VITE_SUPABASE_ANON_KEY.includes('dummy');
 
-        if (!hasRealCredentials) {
-          console.log('No real Supabase credentials found, using demo mode');
+        // If no real credentials OR demo is not disabled, use demo mode immediately
+        if (!hasRealCredentials || noDemoParam !== 'true') {
+          console.log('Using demo mode (no real credentials or demo mode enabled)');
           setUser(DEMO_USER);
           setLoading(false);
           return;
         }
 
-        // Try to get existing session with timeout
+        // Only try to check session if we have real credentials AND demo is explicitly disabled
+        console.log('Attempting to check for existing Supabase session...');
         try {
-          console.log('Checking for existing Supabase session...');
-          
           const sessionPromise = authService.getCurrentSession();
           const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('Session check timeout')), 5000)
+            setTimeout(() => reject(new Error('Session check timeout')), 2000)
           );
           
           const session = await Promise.race([sessionPromise, timeoutPromise]) as any;
@@ -91,28 +83,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               role: 'Owner',
               campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
             });
-            setLoading(false);
-            return;
+          } else {
+            console.log('No session found, using demo mode fallback');
+            setUser(DEMO_USER);
           }
         } catch (sessionErr) {
-          console.warn('Session check failed or timed out, using demo mode:', sessionErr);
+          console.warn('Session check failed, using demo mode:', sessionErr);
+          setUser(DEMO_USER);
+        } finally {
+          setLoading(false);
         }
-
-        // No session found or check failed - use demo mode as fallback
-        console.log('Using demo mode fallback');
-        setUser(DEMO_USER);
-        setLoading(false);
 
       } catch (err) {
         console.error('Auth initialization error:', err);
-        // Emergency fallback - always set demo user
         setUser(DEMO_USER);
         setLoading(false);
       }
     };
 
     initializeAuth();
-  }, []); // Empty dependency array - run once on mount
+  }, []);
 
   const isAuthenticated = user !== null;
 
@@ -121,7 +111,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setError(null);
       setLoading(true);
       
-      // Try real authentication first
       const result = await authService.signIn(email, password) as any;
       if (result?.data?.user) {
         setUser({
