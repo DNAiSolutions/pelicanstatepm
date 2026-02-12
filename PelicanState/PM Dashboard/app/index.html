@@ -15,6 +15,17 @@
       #root {
         display: none;
       }
+      #app-loaded {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: white;
+        padding: 40px;
+        z-index: 9999;
+      }
       .loading-screen {
         position: fixed;
         top: 0;
@@ -46,49 +57,63 @@
         color: #666;
         margin: 0;
       }
-      .error {
-        color: #d32f2f;
-        padding: 20px;
-        background: #fff3cd;
-        border: 1px solid #ffc107;
-        border-radius: 4px;
-        max-width: 500px;
-        white-space: pre-wrap;
-        font-family: monospace;
-        font-size: 12px;
-      }
     </style>
     <script>
-      console.log('Page loading...');
-      window.__startTime__ = Date.now();
+      window.__reactError__ = null;
+      window.__reactLoaded__ = false;
+      console.log('[Page Init] Starting...');
       
-      // Fallback in case React fails
-      window.__showError__ = function(msg) {
-        document.body.innerHTML = '<div class="loading-screen"><div class="loading-content"><div class="error">ERROR:\n\n' + msg + '</div></div></div>';
-        console.error('Application Error:', msg);
+      // Show success message when React mounts
+      window.__onAppReady__ = function() {
+        console.log('[App Ready] React mounted successfully');
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('app-loaded').style.display = 'block';
+        window.__reactLoaded__ = true;
       };
-
-      // Safety timeout
+      
+      // Fallback error handler
+      window.__showReactError__ = function(msg) {
+        window.__reactError__ = msg;
+        console.error('[React Error]', msg);
+        document.getElementById('app-loaded').innerHTML = '<div style="color: red; white-space: pre-wrap; font-family: monospace;"><h2>React Error:</h2>' + msg + '</div>';
+        document.getElementById('loading').style.display = 'none';
+        document.getElementById('app-loaded').style.display = 'block';
+      };
+      
+      // Safety timeout - if React hasn't loaded in 5 seconds, show fallback
       setTimeout(function() {
-        if (!window.__appLoaded__) {
-          window.__showError__('Application failed to load within 10 seconds.\n\nCheck browser console for details.');
+        if (!window.__reactLoaded__ && !window.__reactError__) {
+          window.__showReactError__('App initialization took too long (>5s).\n\nCheck browser console for details.');
         }
-      }, 10000);
+      }, 5000);
     </script>
   </head>
   <body>
-    <div class="loading-screen">
+    <div id="loading" class="loading-screen">
       <div class="loading-content">
         <div class="spinner"></div>
         <p>Loading application...</p>
       </div>
     </div>
+    <div id="app-loaded" style="display: none;">
+      <h1>✅ App is initializing...</h1>
+      <p>React has not yet rendered content. This is a sign something is wrong.</p>
+    </div>
     <div id="root"></div>
     <script type="module">
-      import('./src/main.tsx').catch(function(err) {
-        window.__showError__(err.toString() + '\n\n' + (err.stack || ''));
-      });
-      window.__appLoaded__ = true;
+      console.log('[React Init] Starting React module...');
+      try {
+        import('./src/main.tsx').then(() => {
+          console.log('[React Init] Main module imported successfully');
+          window.__onAppReady__();
+        }).catch((err) => {
+          console.error('[React Init] Error importing main:', err);
+          window.__showReactError__(String(err));
+        });
+      } catch (err) {
+        console.error('[React Init] Error starting module:', err);
+        window.__showReactError__(String(err));
+      }
     </script>
   </body>
 </html>
