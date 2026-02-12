@@ -1,14 +1,5 @@
 {
-  "projects": [
-    {
-      "src": "PelicanState/PM Dashboard/app",
-      "use": "@vercel/static-build",
-      "config": {
-        "distDir": "dist",
-        "framework": "vite"
-      }
-    }
-  ],
-  "buildCommand": "npm run build",
-  "framework": "vite"
+  "buildCommand": "cd 'PelicanState/PM Dashboard/app' && npm run build",
+  "installCommand": "cd 'PelicanState/PM Dashboard/app' && npm install",
+  "outputDirectory": "PelicanState/PM Dashboard/app/dist"
 }
