@@ -1,5 +1,5 @@
 {
-  "buildCommand": "cd 'PelicanState/PM Dashboard/app' && npm run build",
-  "installCommand": "cd 'PelicanState/PM Dashboard/app' && npm install",
-  "outputDirectory": "PelicanState/PM Dashboard/app/dist"
+  "buildCommand": "npm --prefix \"./PelicanState/PM Dashboard/app\" run build",
+  "installCommand": "npm --prefix \"./PelicanState/PM Dashboard/app\" install",
+  "outputDirectory": "./PelicanState/PM Dashboard/app/dist"
 }
