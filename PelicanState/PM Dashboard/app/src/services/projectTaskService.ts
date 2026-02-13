@@ -4,7 +4,10 @@ import {
   type WorkOrder,
   type WorkOrderCategory,
   type WorkOrderStatus,
+  type TaskTemplate,
 } from '../data/pipeline';
+
+export type { TaskTemplate } from '../data/pipeline';
 
 const statusColumns: Record<WorkOrderStatus, 'todo' | 'inprogress' | 'done'> = {
   Requested: 'todo',
@@ -20,18 +23,6 @@ const statusColumns: Record<WorkOrderStatus, 'todo' | 'inprogress' | 'done'> = {
   Closed: 'done',
 };
 
-export type TaskTemplate =
-  | 'default'
-  | 'historicRestoration'
-  | 'eventSetup'
-  | 'lightingUpgrade'
-  | 'hvacRepair'
-  | 'tenantFinish'
-  | 'roofing'
-  | 'sitework'
-  | 'plumbing'
-  | 'concrete';
-
 type WorkOrderMaterial = NonNullable<WorkOrder['materials']>[number];
 type WorkOrderLabor = NonNullable<WorkOrder['labor']>[number];
 
@@ -46,6 +37,10 @@ export type TemplateTask = {
   category?: WorkOrderCategory;
   materials?: TemplateMaterial[];
   labor?: TemplateLabor[];
+  phase?: string;
+  wbsCode?: string;
+  durationHours?: number;
+  dependsOn?: string[];
 };
 
 export type ProjectPlan = {

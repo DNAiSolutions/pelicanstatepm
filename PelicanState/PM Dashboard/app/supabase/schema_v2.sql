@@ -53,7 +53,18 @@ CREATE TABLE IF NOT EXISTS work_requests (
   campus_id UUID NOT NULL REFERENCES campuses(id) ON DELETE RESTRICT,
   property TEXT NOT NULL,
   is_historic BOOLEAN DEFAULT FALSE,
-  category TEXT NOT NULL CHECK (category IN ('Small Task', 'Event Support', 'Construction Project')),
+  category TEXT NOT NULL CHECK (
+    category IN (
+      'Emergency Response',
+      'Preventative Maintenance',
+      'Capital Improvement',
+      'Tenant Improvement',
+      'Event Support',
+      'Grounds & Landscape',
+      'Historic Conservation',
+      'Small Works'
+    )
+  ),
   priority TEXT CHECK (priority IN ('Critical', 'High', 'Medium', 'Low')) DEFAULT 'Medium',
   description TEXT NOT NULL,
   scope_of_work TEXT,
@@ -228,4 +239,3 @@ USING (
   campus_id IN (SELECT unnest(campus_assigned) FROM auth.users WHERE id = auth.uid())
   OR EXISTS (SELECT 1 FROM auth.users WHERE id = auth.uid() AND role IN ('Owner', 'Developer'))
 );
-

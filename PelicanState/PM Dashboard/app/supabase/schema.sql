@@ -44,7 +44,18 @@ CREATE TABLE IF NOT EXISTS work_requests (
   campus_id UUID NOT NULL REFERENCES campuses(id) ON DELETE RESTRICT,
   property TEXT NOT NULL,
   is_historic BOOLEAN DEFAULT FALSE,
-  category TEXT NOT NULL CHECK (category IN ('Small Task', 'Event Support', 'Construction Project')),
+  category TEXT NOT NULL CHECK (
+    category IN (
+      'Emergency Response',
+      'Preventative Maintenance',
+      'Capital Improvement',
+      'Tenant Improvement',
+      'Event Support',
+      'Grounds & Landscape',
+      'Historic Conservation',
+      'Small Works'
+    )
+  ),
   description TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'Intake' CHECK (
     status IN ('Intake', 'Scoping', 'Estimate', 'Approval', 'Schedule', 'Progress', 'Complete', 'Invoice', 'Paid')

@@ -5,11 +5,18 @@ import {
   type Project,
   type Lead,
   type Contact,
+  type Invoice,
+  type PermitRecord,
+  type HistoricArtifact,
   getProjectById,
   getLeadsByProjectId,
   getContactsByProjectId,
+  getInvoicesByProjectId,
+  getPermitsByProject,
+  getHistoricArtifactsByProject,
   generateProjectShareToken,
 } from '../data/pipeline';
+import { contractService } from './contractService';
 
 type NewProjectPayload = Omit<Project, 'id' | 'shareToken' | 'clientVisibility'> & {
   clientVisibility?: Project['clientVisibility'];
@@ -84,6 +91,44 @@ export const projectService = {
     const project = getProjectById(projectId);
     if (!project) return undefined;
     return generateProjectShareToken(projectId);
+  },
+
+  async getProjectContracts(projectId: string) {
+    return contractService.listByProject(projectId);
+  },
+
+  async getFinancialSnapshot(projectId: string) {
+    const contracts = contractService.listByProject(projectId);
+    const summaries = contracts.map((contract) => contractService.getFinancialSummary(contract.id));
+    const totals = summaries.reduce(
+      (acc, summary) => {
+        acc.contractValue += summary.contractValue || 0;
+        acc.amountBilled += summary.amountBilled;
+        acc.amountEarned += summary.amountEarned;
+        acc.grossMargin += summary.grossMargin;
+        acc.retainageHeld += summary.retainageHeld;
+        return acc;
+      },
+      { contractValue: 0, amountBilled: 0, amountEarned: 0, grossMargin: 0, retainageHeld: 0 }
+    );
+
+    return {
+      contracts,
+      summaries,
+      totals,
+    };
+  },
+
+  async getProjectInvoices(projectId: string): Promise<Invoice[]> {
+    return getInvoicesByProjectId(projectId).map((invoice) => ({ ...invoice }));
+  },
+
+  async getProjectPermits(projectId: string): Promise<PermitRecord[]> {
+    return getPermitsByProject(projectId).map((permit) => ({ ...permit }));
+  },
+
+  async getProjectHistoricArtifacts(projectId: string): Promise<HistoricArtifact[]> {
+    return getHistoricArtifactsByProject(projectId).map((artifact) => ({ ...artifact }));
   },
 };
 
