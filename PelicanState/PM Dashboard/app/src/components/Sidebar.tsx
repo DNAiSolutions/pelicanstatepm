@@ -1,8 +1,8 @@
-import { 
-  LayoutDashboard, 
-  FolderKanban, 
-  FileText, 
-  DollarSign, 
+import {
+  LayoutDashboard,
+  FolderKanban,
+  FileText,
+  DollarSign,
   Calendar,
   BarChart3,
   Zap,
@@ -32,12 +32,19 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
 
   const mainMenuItems = [
     { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-    { path: '/projects', label: 'Projects', icon: FolderKanban, badge: '28' },
-    { path: '/leads', label: 'Leads', icon: Handshake },
     { path: '/contacts', label: 'Contacts', icon: UserCircle2 },
-    { path: '/estimates', label: 'Estimate', icon: FileText },
-    { path: '/billing', label: 'Billing', icon: DollarSign, badge: '14' },
-    { path: '/walkthroughs', label: 'Walkthroughs', icon: ClipboardList },
+    { path: '/leads', label: 'Leads', icon: Handshake },
+    {
+      path: '/projects',
+      label: 'Projects',
+      icon: FolderKanban,
+      children: [
+        { path: '/walkthroughs', label: 'Walkthroughs', icon: ClipboardList },
+        { path: '/estimates', label: 'Estimates', icon: FileText },
+        { path: '/invoices', label: 'Invoices', icon: DollarSign },
+        { path: '/work-requests', label: 'Work Orders', icon: ClipboardList },
+      ],
+    },
     { path: '/historic-documentation', label: 'Historic Docs', icon: BookOpen },
     { path: '/schedules', label: 'Schedule', icon: Calendar },
   ];
@@ -91,30 +98,37 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
               const Icon = item.icon;
               const active = isActive(item.path);
               return (
-                <Link
-                  key={item.path}
-                  to={item.path}
-                  className={`w-full flex items-center gap-3 px-3 py-2.5 transition-all ${
-                    active
-                      ? 'bg-primary-500 text-white'
-                      : 'text-neutral-700 hover:bg-neutral-100'
-                  }`}
-                  title={isCollapsed ? item.label : undefined}
-                >
-                  <Icon className="w-5 h-5 flex-shrink-0" />
-                  {!isCollapsed && (
-                    <div className="flex-1 flex items-center justify-between">
-                      <span className="font-medium text-sm">{item.label}</span>
-                      {item.badge && (
-                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${
-                          active ? 'bg-white/20' : 'bg-primary-50 text-primary-700'
-                        }`}>
-                          {item.badge}
-                        </span>
-                      )}
+                <div key={item.path} className="space-y-1">
+                  <Link
+                    to={item.path}
+                    className={`w-full flex items-center gap-3 px-3 py-2.5 transition-all ${
+                      active ? 'bg-primary-500 text-white' : 'text-neutral-700 hover:bg-neutral-100'
+                    }`}
+                    title={isCollapsed ? item.label : undefined}
+                  >
+                    <Icon className="w-5 h-5 flex-shrink-0" />
+                    {!isCollapsed && <span className="font-medium text-sm">{item.label}</span>}
+                  </Link>
+                  {!isCollapsed && item.children && (
+                    <div className="ml-8 border-l border-neutral-200 pl-3 space-y-1">
+                      {item.children.map((child) => {
+                        const ChildIcon = child.icon;
+                        const childActive = isActive(child.path);
+                        return (
+                          <Link
+                            key={child.path}
+                            to={child.path}
+                            className={`flex items-center gap-2 px-2 py-1 text-xs rounded ${
+                              childActive ? 'text-[#143352] font-semibold' : 'text-neutral-600 hover:text-[#143352]'
+                            }`}
+                          >
+                            <ChildIcon className="w-4 h-4" /> {child.label}
+                          </Link>
+                        );
+                      })}
                     </div>
                   )}
-                </Link>
+                </div>
               );
             })}
           </div>
@@ -150,6 +164,8 @@ export function Sidebar({ isCollapsed }: SidebarProps) {
             })}
           </div>
         </nav>
+
+        {/* Client View links removed per request */}
 
         {/* Bottom Utilities */}
         <nav className="px-3 py-4 border-t border-neutral-200">

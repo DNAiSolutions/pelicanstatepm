@@ -23,6 +23,7 @@ export const contactService = {
     const newContact: Contact = {
       ...payload,
       id: `contact-${Date.now()}`,
+      clientPortalEnabled: payload.clientPortalEnabled ?? false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };

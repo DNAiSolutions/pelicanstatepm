@@ -22,8 +22,18 @@ export type WorkOrderStatus =
 
 export type ProjectStatus = 'Planning' | 'PreConstruction' | 'Active' | 'Closeout' | 'OnHold' | 'Completed';
 
-export type LeadStage = 'New' | 'Qualified' | 'Proposal' | 'Negotiation' | 'Won' | 'Lost';
+export type LeadStage = 'New' | 'Walkthrough' | 'Qualified' | 'Proposal' | 'Negotiation' | 'Won' | 'Lost';
 export type LeadSource = 'Referral' | 'Inbound' | 'Event' | 'Cold Outreach' | 'Returning Client' | 'Client Portal';
+export type IntakeChannel = 'Phone' | 'ClientPortal' | 'WebForm' | 'Internal' | 'Email';
+export type LeadNextStep = 'ScheduleWalkthrough' | 'NurtureSequence' | 'DispatchCrew' | 'EstimateOnly' | 'SendAiEstimate';
+
+export const LEAD_NEXT_STEP_LABELS: Record<LeadNextStep, string> = {
+  ScheduleWalkthrough: 'Schedule walkthrough',
+  NurtureSequence: 'Nurture sequence',
+  DispatchCrew: 'Dispatch crew',
+  EstimateOnly: 'Estimate only',
+  SendAiEstimate: 'Send AI estimate for approval',
+};
 
 export type ContactType = 'Client' | 'Internal' | 'Vendor' | 'Partner';
 
@@ -42,6 +52,166 @@ export type WorkLogType = 'note' | 'delay' | 'changeOrder' | 'approval' | 'sched
 
 export type Priority = 'Critical' | 'High' | 'Medium' | 'Low';
 
+export type ContractType = 'Fixed' | 'T&M' | 'CostPlus' | 'Retainer';
+export type BillingMethod = 'Milestone' | 'Progress' | 'Simple';
+export type ContractStatus = 'Draft' | 'Active' | 'Closed';
+export type MilestoneStatus = 'Pending' | 'ReadyToBill' | 'Invoiced' | 'Paid';
+export type TaskTemplate =
+  | 'default'
+  | 'historicRestoration'
+  | 'eventSetup'
+  | 'lightingUpgrade'
+  | 'hvacRepair'
+  | 'tenantFinish'
+  | 'roofing'
+  | 'sitework'
+  | 'plumbing'
+  | 'concrete';
+export type IntakeComplianceSeverity = 'Info' | 'Warning' | 'Critical' | 'Caution' | 'Danger';
+export interface WalkthroughPrepBrief {
+  projectType: string;
+  summary: string;
+  keyQuestions: string[];
+  recommendedTrades: string[];
+  supplies: { item: string; quantity?: string; notes?: string }[];
+}
+
+export interface WalkthroughStep {
+  title: string;
+  instructions: string;
+  trades: string[];
+  materials: string[];
+  durationHours?: number;
+}
+
+export interface WalkthroughPlan {
+  steps: WalkthroughStep[];
+  supplyList: { item: string; quantity?: string; responsible?: string; notes?: string }[];
+  laborStack: { role: string; hours: number; rate?: number }[];
+  checklist: string[];
+}
+
+export interface WalkthroughSessionRecord {
+  id: string;
+  leadId: string;
+  projectId?: string;
+  campusId?: string;
+  scheduledDate: string;
+  status: 'Scheduled' | 'InProgress' | 'Complete';
+  notes?: string;
+  aiPlan?: WalkthroughPlan;
+  responses?: Record<string, string>;
+  attachments?: string[];
+  finalizedPlan?: WalkthroughPlan;
+}
+export type PermitStatus =
+  | 'NotRequired'
+  | 'Needed'
+  | 'Drafting'
+  | 'Submitted'
+  | 'InReview'
+  | 'RevisionsRequired'
+  | 'Approved'
+  | 'Issued'
+  | 'Finaled'
+  | 'Closed';
+export type HistoricArtifactType = 'MaterialSpec' | 'MethodStatement' | 'ConditionAssessment' | 'ReplacementJustification' | 'ReviewComment';
+export type HistoricReviewStatus = 'Draft' | 'Submitted' | 'Approved' | 'ChangesRequested';
+export type IntakeChecklistCategory = 'Questions' | 'Measurements' | 'Photos' | 'Tools' | 'Safety';
+export type IntakeResearchCategory = 'Permit' | 'Code' | 'Material' | 'Contact';
+export type IntakeMessageRole = 'User' | 'Assistant';
+
+export interface IntakeChecklistItem {
+  id: string;
+  text: string;
+  reason?: string;
+  required: boolean;
+  checked: boolean;
+  userAdded?: boolean;
+}
+
+export interface IntakeSafetyNote {
+  id: string;
+  text: string;
+  severity: IntakeComplianceSeverity;
+  source?: string;
+}
+
+export interface IntakeResearchSnippet {
+  id: string;
+  category: IntakeResearchCategory;
+  title: string;
+  content: string;
+  jurisdiction?: 'Louisiana' | 'NewOrleans' | 'BatonRouge';
+  source: 'KnowledgeBase' | 'LLM';
+  confidence: number;
+}
+
+export interface ScopeComplianceFlag {
+  id: string;
+  type: 'Historic' | 'Permit' | 'Safety' | 'Environmental';
+  message: string;
+  severity: IntakeComplianceSeverity;
+  source: string;
+}
+
+export interface ScopeAnalysisResult {
+  scopeText: string;
+  primaryTemplate: TaskTemplate;
+  primaryConfidence: number;
+  secondarySuggestions: { template: TaskTemplate; confidence: number }[];
+  complianceFlags: ScopeComplianceFlag[];
+  detectedKeywords: string[];
+  suggestedJurisdiction?: 'Louisiana' | 'NewOrleans' | 'BatonRouge';
+  rationale?: string;
+}
+
+export interface ConsultationChecklist {
+  id: string;
+  projectId?: string;
+  jobType: TaskTemplate;
+  questions: IntakeChecklistItem[];
+  measurements: IntakeChecklistItem[];
+  photos: IntakeChecklistItem[];
+  tools: IntakeChecklistItem[];
+  safetyNotes: IntakeSafetyNote[];
+  research: IntakeResearchSnippet[];
+  generatedAt: string;
+  updatedAt?: string;
+}
+
+export interface IntakeConversationMessage {
+  id: string;
+  role: IntakeMessageRole;
+  content: string;
+  timestamp: string;
+}
+
+export interface IntakeConversationState {
+  id: string;
+  scopeSummary: string;
+  messages: IntakeConversationMessage[];
+  pendingQuestions: string[];
+  responses: Record<string, string>;
+  recommendedTemplate: TaskTemplate;
+  readyForPlan: boolean;
+}
+
+export interface WbsTask {
+  code: string;
+  title: string;
+  description: string;
+  category: WorkOrderCategory;
+  durationHours: number;
+  dependsOn?: string[];
+}
+
+export interface WbsPhase {
+  phase: string;
+  summary: string;
+  tasks: WbsTask[];
+}
+
 export interface Site {
   id: string;
   campusId: string;
@@ -55,7 +225,7 @@ export interface Project {
   id: string;
   name: string;
   siteId: string;
-   campusId?: string;
+  campusId?: string;
   clientName: string;
   clientPhone: string;
   clientEmail: string;
@@ -71,6 +241,8 @@ export interface Project {
   endDate: string;
   totalBudget: number;
   spentBudget: number;
+  walkthroughNotes?: string;
+  walkthroughPlan?: WalkthroughPlan;
 }
 
 export interface Contact {
@@ -86,6 +258,7 @@ export interface Contact {
   leadIds: string[];
   preferredChannel?: 'Email' | 'Phone' | 'Text';
   notes?: string;
+  clientPortalEnabled?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -97,6 +270,23 @@ export interface LeadIntakeMetadata {
   materialSummary?: string;
   laborSummary?: string;
   submittedBy?: string;
+  issueSummary?: string;
+  jobAddress?: string;
+  urgency?: Priority;
+  accessNotes?: string;
+  attachments?: string[];
+  intakeChannel?: IntakeChannel;
+  recordedById?: string;
+  recommendedNextStep?: LeadNextStep;
+  decisionConfidence?: number;
+  decisionNotes?: string;
+  walkthroughNeeded?: boolean;
+  nextStepStatus?: 'Pending' | 'InProgress' | 'Completed';
+  preferredChannel?: 'Email' | 'Phone' | 'Text';
+  callSource?: string;
+  handledBy?: string;
+  projectType?: string;
+  submissionSource?: 'Web' | 'Internal';
 }
 
 export interface Lead {
@@ -116,6 +306,60 @@ export interface Lead {
   createdAt: string;
   updatedAt: string;
   intakeMetadata?: LeadIntakeMetadata;
+  intakeChannel?: IntakeChannel;
+  recommendedNextStep?: LeadNextStep;
+  decisionConfidence?: number;
+  decisionNotes?: string;
+  jobAddress?: string;
+  urgency?: Priority;
+  accessNotes?: string;
+  attachments?: string[];
+  followUpStatus?: 'Pending' | 'InProgress' | 'Completed';
+  preferredChannel?: 'Email' | 'Phone' | 'Text';
+  callSource?: string;
+  handledBy?: string;
+  walkthroughScheduled?: boolean;
+  walkthroughDate?: string;
+  walkthroughEventId?: string;
+  walkthroughNotes?: string;
+  projectType?: string;
+  walkthroughPrepBrief?: WalkthroughPrepBrief;
+  walkthroughSessionIds?: string[];
+  walkthroughPlan?: WalkthroughPlan;
+}
+
+export interface ClientAccount {
+  id: string;
+  company: string;
+  primaryContact: string;
+  email: string;
+  phone: string;
+  projectIds: string[];
+  notes?: string;
+}
+
+export interface LeadIntakeRecord {
+  id: string;
+  leadId: string;
+  capturedAt: string;
+  formSnapshot: {
+    companyName: string;
+    contactName: string;
+    email: string;
+    phone: string;
+    campusId?: string;
+    issueSummary: string;
+    jobAddress?: string;
+    urgency?: Priority;
+    accessNotes?: string;
+    attachments?: string[];
+    intakeChannel: IntakeChannel;
+  };
+  decision: {
+    nextStep: LeadNextStep;
+    confidence: number;
+    rationale: string;
+  };
 }
 
 export type WorkOrderCategory =
@@ -231,12 +475,20 @@ export interface Invoice {
   id: string;
   invoiceNumber: string;
   projectId: string;
+  contractId?: string;
   campusId: string;
   fundingCode: string;
   primeVendorId: string;
   workOrderIds: string[];
   lineItems: InvoiceLineItem[];
   totalAmount: number;
+  billingReferenceId?: string;
+  retainageWithheld?: number;
+  retainageReleased?: number;
+  grossMarginSnapshot?: number;
+  stripePaymentIntentId?: string;
+  quickbooksInvoiceId?: string;
+  auditLogId?: string;
   status: InvoiceStatus;
   submittedAt?: string;
   approvedAt?: string;
@@ -246,6 +498,167 @@ export interface Invoice {
   paymentReference?: string;
   notes?: string;
   createdAt: string;
+}
+
+export interface PaymentSyncRecord {
+  id: string;
+  invoiceId: string;
+  provider: 'Stripe' | 'QuickBooks';
+  status: 'Pending' | 'Synced' | 'Failed';
+  reference?: string;
+  payload?: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface FinancialAuditEntry {
+  id: string;
+  entity: 'Contract' | 'Invoice' | 'Payment' | 'AI';
+  entityId: string;
+  action: string;
+  actorId: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface Contract {
+  id: string;
+  projectId: string;
+  contractType: ContractType;
+  billingMethod: BillingMethod;
+  contractValue?: number;
+  feePercentage?: number;
+  retainerAmount?: number;
+  retainagePercentage?: number;
+  startDate: string;
+  endDate?: string;
+  status: ContractStatus;
+  createdBy: string;
+  approvedBy?: string;
+  approvedAt?: string;
+  aiRecommendationId?: string;
+  notes?: string;
+}
+
+export interface Milestone {
+  id: string;
+  contractId: string;
+  name: string;
+  description?: string;
+  scheduledDate?: string;
+  amount: number;
+  status: MilestoneStatus;
+  readyToBillAt?: string;
+  invoicedInvoiceId?: string;
+  paidAt?: string;
+}
+
+export interface ScheduleOfValuesEntry {
+  id: string;
+  contractId: string;
+  lineItem: string;
+  budgetAmount: number;
+  percentComplete: number;
+  amountEarned: number;
+  lastUpdated: string;
+}
+
+export type CostLedgerCategory = 'Labor' | 'Material' | 'Subcontractor' | 'Equipment' | 'Permit' | 'Contingency';
+
+export interface CostLedgerEntry {
+  id: string;
+  projectId: string;
+  contractId: string;
+  category: CostLedgerCategory;
+  description: string;
+  committedAmount?: number;
+  actualAmount?: number;
+  vendorId?: string;
+  invoiceReference?: string;
+  recordedBy: string;
+  recordedAt: string;
+}
+
+export interface AIContractRecommendation {
+  id: string;
+  projectId: string;
+  suggestedContract: ContractType;
+  suggestedBilling: BillingMethod;
+  rationale: string;
+  riskScore: number;
+  confidenceScore: number;
+  aiInputSnapshot: Record<string, unknown>;
+  aiOutputSnapshot: Record<string, unknown>;
+  humanOverride?: boolean;
+  overrideReason?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface AIPricingSnapshot {
+  id: string;
+  projectId: string;
+  contractId?: string;
+  directCost: number;
+  overheadAllocated: number;
+  contingency: number;
+  grossProfit: number;
+  projectedMargin: number;
+  riskScore: number;
+  suggestedContractType: ContractType;
+  pricingVersion: string;
+  laborRateSnapshot: Record<string, unknown>;
+  overheadRateSnapshot: Record<string, unknown>;
+  contingencyNotes?: string;
+  createdAt: string;
+  createdBy: string;
+}
+
+export interface PermitRecord {
+  id: string;
+  projectId: string;
+  workOrderId?: string;
+  jurisdictionName: string;
+  jurisdictionType: 'Parish' | 'City' | 'State' | 'Federal';
+  permitType: 'Building' | 'Electrical' | 'Mechanical' | 'Plumbing' | 'Demolition' | 'Signage' | 'Other';
+  codeSet?: 'IBC' | 'IRC' | 'IEBC' | 'NFPA' | 'Other';
+  codeVersion?: string;
+  reviewerAuthority: 'LocalAHJ' | 'OSFM' | 'ThirdParty' | 'Client';
+  reviewerContact?: string;
+  status: PermitStatus;
+  submissionDate?: string;
+  approvalDate?: string;
+  expirationDate?: string;
+  fees?: Array<{ label: string; amount: number; paid: boolean }>;
+  attachments?: string[];
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PermitInspection {
+  id: string;
+  permitId: string;
+  inspectionType: 'Rough' | 'Framing' | 'Final' | 'Electrical' | 'Mechanical' | 'Plumbing' | 'Fire' | 'Other';
+  scheduledAt?: string;
+  result?: 'Pass' | 'Fail' | 'Partial' | 'Reschedule';
+  inspectorNotes?: string;
+  attachments?: string[];
+}
+
+export interface HistoricArtifact {
+  id: string;
+  projectId: string;
+  workOrderId?: string;
+  artifactType: HistoricArtifactType;
+  description: string;
+  evidenceUrls: string[];
+  reviewerRequired: boolean;
+  reviewStatus: HistoricReviewStatus;
+  reviewerId?: string;
+  reviewerNotes?: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface User {
@@ -498,6 +911,7 @@ export const mockContacts: Contact[] = [
     leadIds: ['lead-1'],
     preferredChannel: 'Email',
     notes: 'Prefers weekly written updates.',
+    clientPortalEnabled: true,
     createdAt: '2024-04-10T12:00:00Z',
     updatedAt: '2024-10-01T10:00:00Z',
   },
@@ -513,6 +927,7 @@ export const mockContacts: Contact[] = [
     leadIds: ['lead-2'],
     preferredChannel: 'Phone',
     notes: 'Handles vendor escalations.',
+    clientPortalEnabled: false,
     createdAt: '2024-02-15T15:00:00Z',
     updatedAt: '2024-09-20T09:00:00Z',
   },
@@ -529,6 +944,7 @@ export const mockContacts: Contact[] = [
     leadIds: ['lead-2'],
     preferredChannel: 'Email',
     notes: 'Needs board-ready updates monthly.',
+    clientPortalEnabled: true,
     createdAt: '2024-03-05T18:00:00Z',
     updatedAt: '2024-07-12T08:00:00Z',
   },
@@ -545,6 +961,7 @@ export const mockContacts: Contact[] = [
     leadIds: [],
     preferredChannel: 'Email',
     notes: 'Focus on phased budgeting.',
+    clientPortalEnabled: false,
     createdAt: '2024-08-01T14:00:00Z',
     updatedAt: '2024-10-15T11:00:00Z',
   },
@@ -561,6 +978,7 @@ export const mockContacts: Contact[] = [
     leadIds: ['lead-4'],
     preferredChannel: 'Email',
     notes: 'Reports to city council monthly; needs visuals for updates.',
+    clientPortalEnabled: true,
     createdAt: '2024-06-01T12:00:00Z',
     updatedAt: '2024-10-10T08:00:00Z',
   },
@@ -577,6 +995,7 @@ export const mockContacts: Contact[] = [
     leadIds: ['lead-5'],
     preferredChannel: 'Phone',
     notes: 'Prefers morning coordination calls before 9am.',
+    clientPortalEnabled: false,
     createdAt: '2024-05-20T15:00:00Z',
     updatedAt: '2024-10-05T11:00:00Z',
   },
@@ -593,6 +1012,7 @@ export const mockContacts: Contact[] = [
     leadIds: ['lead-6'],
     preferredChannel: 'Email',
     notes: 'Wants ROI summaries tied to bookings.',
+    clientPortalEnabled: true,
     createdAt: '2024-04-18T13:00:00Z',
     updatedAt: '2024-11-05T09:00:00Z',
   },
@@ -701,6 +1121,22 @@ export const mockLeads: Lead[] = [
     updatedAt: '2024-10-02T11:30:00Z',
   },
 ];
+
+export const mockClientAccounts: ClientAccount[] = [
+  {
+    id: 'client-account-1',
+    company: 'Pelican Hospitality Group',
+    primaryContact: 'Marisa Leblanc',
+    email: 'marisa@pelicanhospitality.com',
+    phone: '(504) 555-0820',
+    projectIds: ['proj-9', 'proj-8'],
+    notes: 'Prefers quarterly updates and on-demand intake access.',
+  },
+];
+
+export const mockWalkthroughSessions: WalkthroughSessionRecord[] = [];
+
+export const mockLeadIntakeRecords: LeadIntakeRecord[] = [];
 
 export const mockWorkOrders: WorkOrder[] = [
   {
@@ -1313,6 +1749,400 @@ export const mockInvoices: Invoice[] = [
   },
 ];
 
+export const mockPaymentSyncRecords: PaymentSyncRecord[] = [
+  {
+    id: 'psr-1',
+    invoiceId: 'inv-1',
+    provider: 'Stripe',
+    status: 'Synced',
+    reference: 'pi_demo_123',
+    payload: { amount: 11850, currency: 'usd' },
+    createdAt: '2024-08-20T12:00:00Z',
+    updatedAt: '2024-08-23T14:00:00Z',
+  },
+  {
+    id: 'psr-2',
+    invoiceId: 'inv-1',
+    provider: 'QuickBooks',
+    status: 'Synced',
+    reference: 'qbo-9981',
+    payload: { customer: 'Woodland Heritage Foundation' },
+    createdAt: '2024-08-20T12:05:00Z',
+    updatedAt: '2024-08-30T09:00:00Z',
+  },
+];
+
+export const mockFinancialAuditLog: FinancialAuditEntry[] = [
+  {
+    id: 'audit-1',
+    entity: 'Invoice',
+    entityId: 'inv-1',
+    action: 'SYNC_STRIPE',
+    actorId: 'user-4',
+    metadata: { intentId: 'pi_demo_123' },
+    createdAt: '2024-08-20T12:00:00Z',
+  },
+  {
+    id: 'audit-2',
+    entity: 'AI',
+    entityId: 'ai-price-1',
+    action: 'PRICING_GENERATED',
+    actorId: 'system-ai',
+    metadata: { margin: 0.305 },
+    createdAt: '2024-09-04T10:00:00Z',
+  },
+];
+
+export const mockContracts: Contract[] = [
+  {
+    id: 'contract-1',
+    projectId: 'proj-1',
+    contractType: 'Fixed',
+    billingMethod: 'Milestone',
+    contractValue: 185000,
+    retainagePercentage: 10,
+    startDate: '2024-09-15',
+    endDate: '2025-07-01',
+    status: 'Active',
+    createdBy: 'user-2',
+    approvedBy: 'user-1',
+    approvedAt: '2024-09-12T16:00:00Z',
+    aiRecommendationId: 'ai-rec-1',
+    notes: 'Includes SHPO contingency and weather clause.',
+  },
+  {
+    id: 'contract-2',
+    projectId: 'proj-3',
+    contractType: 'Retainer',
+    billingMethod: 'Simple',
+    retainerAmount: 18000,
+    retainagePercentage: 0,
+    startDate: '2024-11-01',
+    status: 'Active',
+    createdBy: 'user-4',
+    notes: 'Campus-wide preventative maintenance retainer billed monthly.',
+  },
+  {
+    id: 'contract-3',
+    projectId: 'proj-6',
+    contractType: 'CostPlus',
+    billingMethod: 'Progress',
+    feePercentage: 12,
+    retainagePercentage: 5,
+    startDate: '2024-07-15',
+    status: 'Active',
+    createdBy: 'user-2',
+    approvedBy: 'user-1',
+    approvedAt: '2024-07-10T09:00:00Z',
+    aiRecommendationId: 'ai-rec-2',
+    notes: 'Cost-plus fee capped at $150K. Requires weekly cost ledger updates.',
+  },
+];
+
+export const mockMilestones: Milestone[] = [
+  {
+    id: 'milestone-1',
+    contractId: 'contract-1',
+    name: 'Mobilization + Site Protection',
+    description: 'Site setup, scaffolding, SHPO inspections.',
+    scheduledDate: '2024-09-30',
+    amount: 25000,
+    status: 'Paid',
+    readyToBillAt: '2024-09-28T14:00:00Z',
+    invoicedInvoiceId: 'inv-1',
+    paidAt: '2024-10-15T13:00:00Z',
+  },
+  {
+    id: 'milestone-2',
+    contractId: 'contract-1',
+    name: 'Interior Restoration 60%',
+    scheduledDate: '2024-12-15',
+    amount: 80000,
+    status: 'ReadyToBill',
+    readyToBillAt: '2024-12-10T09:00:00Z',
+  },
+  {
+    id: 'milestone-3',
+    contractId: 'contract-1',
+    name: 'Substantial Completion + Retainage Release',
+    scheduledDate: '2025-06-30',
+    amount: 60000,
+    status: 'Pending',
+  },
+  {
+    id: 'milestone-4',
+    contractId: 'contract-2',
+    name: 'Monthly Retainer – November',
+    scheduledDate: '2024-11-30',
+    amount: 1500,
+    status: 'Invoiced',
+    invoicedInvoiceId: 'inv-1',
+  },
+];
+
+export const mockScheduleOfValues: ScheduleOfValuesEntry[] = [
+  {
+    id: 'sov-1',
+    contractId: 'contract-1',
+    lineItem: 'Historic Envelope Repairs',
+    budgetAmount: 90000,
+    percentComplete: 55,
+    amountEarned: 49500,
+    lastUpdated: '2024-11-18T08:00:00Z',
+  },
+  {
+    id: 'sov-2',
+    contractId: 'contract-1',
+    lineItem: 'Interior Finishes + MEP',
+    budgetAmount: 70000,
+    percentComplete: 30,
+    amountEarned: 21000,
+    lastUpdated: '2024-11-18T08:00:00Z',
+  },
+  {
+    id: 'sov-3',
+    contractId: 'contract-3',
+    lineItem: 'Demolition + Abatement',
+    budgetAmount: 45000,
+    percentComplete: 70,
+    amountEarned: 31500,
+    lastUpdated: '2024-10-15T12:00:00Z',
+  },
+  {
+    id: 'sov-4',
+    contractId: 'contract-3',
+    lineItem: 'Classroom Buildout',
+    budgetAmount: 95000,
+    percentComplete: 25,
+    amountEarned: 23750,
+    lastUpdated: '2024-11-05T10:00:00Z',
+  },
+];
+
+export const mockCostLedgerEntries: CostLedgerEntry[] = [
+  {
+    id: 'cle-1',
+    projectId: 'proj-1',
+    contractId: 'contract-1',
+    category: 'Labor',
+    description: 'Plaster artisan crew weeks 1-4',
+    committedAmount: 28000,
+    actualAmount: 26500,
+    vendorId: 'vendor-1',
+    recordedBy: 'user-2',
+    recordedAt: '2024-10-31T16:00:00Z',
+  },
+  {
+    id: 'cle-2',
+    projectId: 'proj-1',
+    contractId: 'contract-1',
+    category: 'Material',
+    description: 'Historic lime plaster + scaffolding rental',
+    committedAmount: 18000,
+    actualAmount: 17200,
+    vendorId: 'vendor-1',
+    recordedBy: 'user-2',
+    recordedAt: '2024-11-05T09:45:00Z',
+  },
+  {
+    id: 'cle-3',
+    projectId: 'proj-3',
+    contractId: 'contract-2',
+    category: 'Labor',
+    description: 'Monthly PM allowance',
+    actualAmount: 3500,
+    recordedBy: 'user-4',
+    recordedAt: '2024-11-30T18:00:00Z',
+  },
+  {
+    id: 'cle-4',
+    projectId: 'proj-6',
+    contractId: 'contract-3',
+    category: 'Subcontractor',
+    description: 'MEP demo subcontract PO-7781',
+    committedAmount: 52000,
+    actualAmount: 49800,
+    vendorId: 'vendor-2',
+    invoiceReference: 'AP-2391',
+    recordedBy: 'user-4',
+    recordedAt: '2024-10-02T11:30:00Z',
+  },
+];
+
+export const mockAIContractRecommendations: AIContractRecommendation[] = [
+  {
+    id: 'ai-rec-1',
+    projectId: 'proj-1',
+    suggestedContract: 'Fixed',
+    suggestedBilling: 'Milestone',
+    rationale: 'Scope well-defined, SHPO approvals enforceable. Fixed price + milestone billing reduces change order churn.',
+    riskScore: 62,
+    confidenceScore: 0.78,
+    aiInputSnapshot: {
+      scopeClarity: 4,
+      historicFlag: true,
+      permitComplexity: 'Medium',
+      durationDays: 285,
+      clientType: 'StateAgency',
+    },
+    aiOutputSnapshot: { marginBand: '30-35%', retainageRecommended: 10 },
+    createdAt: '2024-09-05T15:00:00Z',
+    createdBy: 'system-ai',
+  },
+  {
+    id: 'ai-rec-2',
+    projectId: 'proj-6',
+    suggestedContract: 'CostPlus',
+    suggestedBilling: 'Progress',
+    rationale: 'Large unknowns in demo + MEP reconfig. Cost-plus w/ progress billing protects margin.',
+    riskScore: 71,
+    confidenceScore: 0.72,
+    aiInputSnapshot: {
+      scopeClarity: 2,
+      historicFlag: false,
+      permitComplexity: 'High',
+      durationDays: 240,
+      campus: 'Jefferson Charter',
+    },
+    aiOutputSnapshot: { marginBand: '22-28%', contingency: 0.12 },
+    createdAt: '2024-07-05T12:30:00Z',
+    createdBy: 'system-ai',
+    humanOverride: false,
+  },
+];
+
+export const mockAIPricingSnapshots: AIPricingSnapshot[] = [
+  {
+    id: 'ai-price-1',
+    projectId: 'proj-1',
+    contractId: 'contract-1',
+    directCost: 41000,
+    overheadAllocated: 4920,
+    contingency: 2870,
+    grossProfit: 6880,
+    projectedMargin: 0.305,
+    riskScore: 58,
+    suggestedContractType: 'Fixed',
+    pricingVersion: 'v1.0.3',
+    laborRateSnapshot: {
+      carpenter: 69.98,
+      pm: 92.5,
+    },
+    overheadRateSnapshot: {
+      annualOverhead: 750000,
+      revenueTarget: 5000000,
+      overheadRate: 0.15,
+    },
+    contingencyNotes: 'Historic unknowns add 7% contingency.',
+    createdAt: '2024-09-04T10:00:00Z',
+    createdBy: 'system-ai',
+  },
+  {
+    id: 'ai-price-2',
+    projectId: 'proj-6',
+    contractId: 'contract-3',
+    directCost: 82000,
+    overheadAllocated: 12300,
+    contingency: 5740,
+    grossProfit: 16840,
+    projectedMargin: 0.24,
+    riskScore: 74,
+    suggestedContractType: 'CostPlus',
+    pricingVersion: 'v1.0.3',
+    laborRateSnapshot: {
+      electrician: 72.4,
+      laborer: 52.1,
+    },
+    overheadRateSnapshot: {
+      annualOverhead: 780000,
+      revenueTarget: 5200000,
+      overheadRate: 0.15,
+    },
+    contingencyNotes: 'MEP unknowns trigger 12% contingency.',
+    createdAt: '2024-07-04T09:00:00Z',
+    createdBy: 'system-ai',
+  },
+];
+
+export const mockPermitRecords: PermitRecord[] = [
+  {
+    id: 'permit-1',
+    projectId: 'proj-1',
+    workOrderId: 'wo-1',
+    jurisdictionName: 'St. John Parish',
+    jurisdictionType: 'Parish',
+    permitType: 'Building',
+    codeSet: 'IBC',
+    codeVersion: '2021',
+    reviewerAuthority: 'LocalAHJ',
+    reviewerContact: 'permitoffice@stjohnparish.gov',
+    status: 'InReview',
+    submissionDate: '2024-09-10',
+    fees: [
+      { label: 'Plan review', amount: 250, paid: true },
+      { label: 'Permit issuance', amount: 450, paid: false },
+    ],
+    attachments: ['https://example.com/permits/wallace-submittal.pdf'],
+    notes: 'Awaiting OSFM coordination.',
+    createdAt: '2024-09-02T12:00:00Z',
+    updatedAt: '2024-10-28T09:00:00Z',
+  },
+  {
+    id: 'permit-2',
+    projectId: 'proj-4',
+    jurisdictionName: 'City of Baton Rouge',
+    jurisdictionType: 'City',
+    permitType: 'Electrical',
+    codeSet: 'IBC',
+    codeVersion: '2021',
+    reviewerAuthority: 'LocalAHJ',
+    status: 'Submitted',
+    submissionDate: '2024-10-05',
+    createdAt: '2024-10-01T15:00:00Z',
+    updatedAt: '2024-10-05T09:30:00Z',
+  },
+];
+
+export const mockPermitInspections: PermitInspection[] = [
+  {
+    id: 'inspection-1',
+    permitId: 'permit-1',
+    inspectionType: 'Rough',
+    scheduledAt: '2024-11-30T09:00:00Z',
+    result: 'Partial',
+    inspectorNotes: 'Need additional bracing at north wall.',
+    attachments: [],
+  },
+];
+
+export const mockHistoricArtifacts: HistoricArtifact[] = [
+  {
+    id: 'artifact-1',
+    projectId: 'proj-1',
+    workOrderId: 'wo-1',
+    artifactType: 'MaterialSpec',
+    description: 'Lime plaster mixture per SHPO guidance.',
+    evidenceUrls: ['https://example.com/photos/plaster-bags.jpg'],
+    reviewerRequired: true,
+    reviewStatus: 'Submitted',
+    createdAt: '2024-10-12T12:00:00Z',
+    updatedAt: '2024-10-12T12:00:00Z',
+  },
+  {
+    id: 'artifact-2',
+    projectId: 'proj-1',
+    artifactType: 'MethodStatement',
+    description: 'Reversible fastening technique for crown molding.',
+    evidenceUrls: ['https://example.com/photos/method-notes.pdf'],
+    reviewerRequired: true,
+    reviewStatus: 'Approved',
+    reviewerId: 'user-1',
+    reviewerNotes: 'Meets Secretary of Interior standards.',
+    createdAt: '2024-10-15T09:00:00Z',
+    updatedAt: '2024-10-20T09:00:00Z',
+  },
+];
+
 // ─────────────────────────────────────────────────────────────
 // Helper Functions
 // ─────────────────────────────────────────────────────────────
@@ -1351,6 +2181,54 @@ export function getWorkOrdersByProjectId(projectId: string): WorkOrder[] {
 
 export function getInvoicesByProjectId(projectId: string): Invoice[] {
   return mockInvoices.filter((inv) => inv.projectId === projectId);
+}
+
+export function getInvoiceById(id: string): Invoice | undefined {
+  return mockInvoices.find((inv) => inv.id === id);
+}
+
+export function getContractById(id: string): Contract | undefined {
+  return mockContracts.find((contract) => contract.id === id);
+}
+
+export function getContractsByProjectId(projectId: string): Contract[] {
+  return mockContracts.filter((contract) => contract.projectId === projectId);
+}
+
+export function getMilestonesByContractId(contractId: string): Milestone[] {
+  return mockMilestones.filter((milestone) => milestone.contractId === contractId);
+}
+
+export function getScheduleOfValuesByContractId(contractId: string): ScheduleOfValuesEntry[] {
+  return mockScheduleOfValues.filter((entry) => entry.contractId === contractId);
+}
+
+export function getCostLedgerByProjectId(projectId: string): CostLedgerEntry[] {
+  return mockCostLedgerEntries.filter((entry) => entry.projectId === projectId);
+}
+
+export function getAIRecommendationsByProject(projectId: string): AIContractRecommendation[] {
+  return mockAIContractRecommendations.filter((rec) => rec.projectId === projectId);
+}
+
+export function getAIPricingSnapshotsByProject(projectId: string): AIPricingSnapshot[] {
+  return mockAIPricingSnapshots.filter((snapshot) => snapshot.projectId === projectId);
+}
+
+export function getAuditLogByEntity(entityId: string): FinancialAuditEntry[] {
+  return mockFinancialAuditLog.filter((entry) => entry.entityId === entityId);
+}
+
+export function getPermitsByProject(projectId: string): PermitRecord[] {
+  return mockPermitRecords.filter((permit) => permit.projectId === projectId);
+}
+
+export function getInspectionsByPermit(permitId: string): PermitInspection[] {
+  return mockPermitInspections.filter((inspection) => inspection.permitId === permitId);
+}
+
+export function getHistoricArtifactsByProject(projectId: string): HistoricArtifact[] {
+  return mockHistoricArtifacts.filter((artifact) => artifact.projectId === projectId);
 }
 
 export function getUserById(id: string): User | undefined {

@@ -37,7 +37,7 @@ export function MainLayout() {
       month: 'long', 
       day: 'numeric' 
     };
-    return `Construction Project - ${today.toLocaleDateString('en-US', options)}`;
+    return `Operations Command Center · ${today.toLocaleDateString('en-US', options)}`;
   };
 
   return (

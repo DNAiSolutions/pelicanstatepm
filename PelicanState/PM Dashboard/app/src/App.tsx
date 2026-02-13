@@ -21,6 +21,10 @@ import { LeadsPage } from './pages/LeadsPage';
 import { ContactsPage } from './pages/ContactsPage';
 import { EstimatesListPage } from './pages/EstimatesListPage';
 import { MainLayout } from './layouts/MainLayout';
+import { PortalLandingPage } from './pages/PortalLandingPage';
+import { PortalProjectsPage } from './pages/PortalProjectsPage';
+import { PortalProjectDetailPage } from './pages/PortalProjectDetailPage';
+import { WalkthroughSessionPage } from './pages/WalkthroughSessionPage';
 
 function AppRoutes() {
   return (
@@ -47,6 +51,10 @@ function AppRoutes() {
         <Route path="/projects/board" element={<ProjectTaskBoardPage />} />
         <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
         <Route path="/client/projects/:projectId/:token" element={<ProjectClientViewPage />} />
+        <Route path="/client-portal" element={<PortalLandingPage />} />
+        <Route path="/client-portal/projects" element={<PortalProjectsPage />} />
+        <Route path="/client-portal/projects/:projectId" element={<PortalProjectDetailPage />} />
+        <Route path="/walkthroughs/new/:leadId" element={<WalkthroughSessionPage />} />
 
         {/* Work Requests */}
         <Route path="/work-requests" element={<WorkRequestListPage />} />
