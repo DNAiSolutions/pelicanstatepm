@@ -1,0 +1,167 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    @apply border-neutral-200;
+  }
+  
+  body {
+    @apply bg-white text-[#1F2933] font-sans antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-heading font-semibold text-[#1F2933];
+    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #f1f1f1;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: #c1c1c1;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: #a8a8a8;
+  }
+}
+
+@layer components {
+  .card {
+    @apply bg-white border border-neutral-200 rounded-none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  }
+  
+  .card-hover {
+    @apply hover:shadow-lg transition-shadow duration-200;
+  }
+  
+  .btn-primary {
+    @apply bg-[#143352] hover:bg-[#0F1F2D] text-white font-medium px-4 py-2 transition-colors duration-200;
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+  
+  .btn-secondary {
+    @apply bg-white hover:bg-neutral-50 text-[#1F2933] font-medium px-4 py-2 border border-neutral-200 transition-colors duration-200;
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+  
+  .input-field {
+    @apply w-full px-4 py-2 border border-neutral-200 bg-white text-[#1F2933] focus:outline-none focus:border-[#143352] transition-colors;
+  }
+  
+  .input-field::placeholder {
+    @apply text-neutral-400;
+  }
+  
+  .status-chip {
+    @apply inline-flex items-center px-3 py-1 text-xs font-medium border;
+  }
+  
+  .status-badge {
+    @apply inline-flex items-center px-2.5 py-0.5 text-xs font-medium;
+  }
+  
+  .status-approved {
+    @apply bg-green-50 text-green-700 border border-green-200;
+  }
+  
+  .status-pending {
+    @apply bg-amber-50 text-amber-700 border border-amber-200;
+  }
+  
+  .status-blocked {
+    @apply bg-red-50 text-red-700 border border-red-200;
+  }
+  
+  .status-in-progress {
+    @apply bg-blue-50 text-blue-700 border border-blue-200;
+  }
+  
+  .status-complete {
+    @apply bg-green-50 text-green-700 border border-green-200;
+  }
+  
+  .status-draft {
+    @apply bg-gray-50 text-gray-700 border border-gray-200;
+  }
+  
+  /* Table styles */
+  .table-container {
+    @apply bg-white border border-neutral-200 overflow-hidden;
+  }
+  
+  .data-table {
+    @apply w-full;
+  }
+  
+  .data-table th {
+    @apply text-left py-3 px-4 text-sm font-semibold text-neutral-700 bg-neutral-50 border-b border-neutral-200;
+  }
+  
+  .data-table td {
+    @apply py-3 px-4 text-sm text-neutral-600 border-b border-neutral-100;
+  }
+  
+  .data-table tr:hover td {
+    @apply bg-neutral-50;
+  }
+  
+  /* Page header */
+  .page-header {
+    @apply mb-6;
+  }
+  
+  .page-title {
+    @apply text-2xl font-heading font-semibold text-[#1F2933];
+  }
+  
+  .page-subtitle {
+    @apply text-neutral-500 mt-1;
+  }
+  
+  /* Section header */
+  .section-header {
+    @apply flex items-center justify-between mb-4;
+  }
+  
+  .section-title {
+    @apply text-lg font-heading font-semibold text-[#1F2933];
+  }
+}
+
+@layer utilities {
+  .text-brand {
+    color: #143352;
+  }
+  
+  .bg-brand {
+    background-color: #143352;
+  }
+  
+  .border-brand {
+    border-color: #143352;
+  }
+  
+  .font-heading {
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+  
+  .font-body {
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+}
