@@ -1,14 +1,18 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, useLocation } from 'react-router-dom';
 import type { UserRole } from '../context/AuthContext';
 import { useAuth } from '../context/AuthContext';
+import type { AccessType } from '../services/userProfileService';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRoles?: UserRole[];
+  requiresProfile?: boolean;
+  allowedAccess?: AccessType[];
 }
 
-export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
-  const { isAuthenticated, loading, user } = useAuth();
+export function ProtectedRoute({ children, requiredRoles, requiresProfile = true, allowedAccess }: ProtectedRouteProps) {
+  const { isAuthenticated, loading, user, profileLoading, requiresOnboarding, accessType } = useAuth();
+  const location = useLocation();
 
   // Show loading state
   if (loading) {
@@ -27,9 +31,14 @@ export function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps)
     return <Navigate to="/login" replace />;
   }
 
-  // In demo mode, grant access automatically
-  if (user?.email === 'demo@pelicanstate.com') {
-    return <>{children}</>;
+  if (requiresProfile && !profileLoading) {
+    if (requiresOnboarding) {
+      if (location.pathname !== '/onboarding') {
+        return <Navigate to="/onboarding" replace />;
+      }
+    } else if (allowedAccess && !allowedAccess.includes(accessType)) {
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   // Check if user has required role

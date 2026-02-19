@@ -16,6 +16,7 @@ import { useAdminDashboardData } from '../hooks/useAdminDashboardData';
 import { getSiteById, getCampusById } from '../data/pipeline';
 import toast from 'react-hot-toast';
 import { LeadIntakeModal } from '../components/leads/LeadIntakeModal';
+import { useAuth } from '../context/AuthContext';
 
 type DisplayWorkOrder = {
   id: string;
@@ -40,8 +41,9 @@ type DisplayInvoice = {
 export function DashboardPage() {
   const navigate = useNavigate();
   const profileData = useProfileData();
-  const { isAdminProfile, projects, workOrders, campuses, invoices, metrics, getProjectMetrics } = profileData;
+  const { isAdminProfile, workOrders, campuses, invoices, metrics, getProjectMetrics, projects } = profileData;
   const adminData = useAdminDashboardData(isAdminProfile);
+  const { profile } = useAuth();
   const [statusFilter, setStatusFilter] = useState<'all' | 'inProgress' | 'completed'>('all');
   const [showLeadIntake, setShowLeadIntake] = useState(false);
 
@@ -165,6 +167,12 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 max-w-7xl">
+      {profile?.status === 'pending' && (
+        <div className="bg-yellow-50 border border-yellow-200 text-sm text-yellow-800 px-4 py-3">
+          Your request for staff access is pending approval. You currently have vendor-level visibility.
+        </div>
+      )}
+
       {/* Page Header */}
       <div className="flex items-start justify-between">
         <div className="flex-1">

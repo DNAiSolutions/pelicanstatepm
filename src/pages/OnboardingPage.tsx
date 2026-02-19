@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ClipboardList, Users, Building2 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
+import { userProfileService } from '../services/userProfileService';
 
 const roleOptions = [
   'Owner / Founder',
@@ -14,30 +16,61 @@ const roleOptions = [
 
 export function OnboardingPage() {
   const navigate = useNavigate();
+  const { user, profile, refreshProfile } = useAuth();
+  const [fullName, setFullName] = useState('');
   const [role, setRole] = useState('Owner / Founder');
   const [department, setDepartment] = useState('');
   const [teamSize, setTeamSize] = useState('1-5');
-  const [priorities, setPriorities] = useState('');
-  const [hasPending, setHasPending] = useState(false);
+  const [accountType, setAccountType] = useState<'vendor' | 'staff'>('vendor');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    const pending = localStorage.getItem('pelican-onboarding-required');
-    setHasPending(Boolean(pending));
-  }, []);
+    if (profile) {
+      setFullName(profile.full_name ?? '');
+      setRole(profile.role_title ?? 'Owner / Founder');
+      setDepartment(profile.department ?? '');
+      setTeamSize(profile.team_size ?? '1-5');
+      setAccountType(profile.requested_access ?? 'vendor');
+    }
+  }, [profile]);
 
-  const handleSubmit = (event: React.FormEvent) => {
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <p className="text-sm text-neutral-500">You need to be signed in to complete onboarding.</p>
+      </div>
+    );
+  }
+
+  const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
-    const payload = {
-      role,
-      department,
-      teamSize,
-      priorities,
-      capturedAt: new Date().toISOString(),
-    };
-    localStorage.setItem('pelican-onboarding-data', JSON.stringify(payload));
-    localStorage.removeItem('pelican-onboarding-required');
-    toast.success('Thanks! Your preferences have been saved.');
-    navigate('/login');
+    try {
+      setSubmitting(true);
+      const status = accountType === 'vendor' ? 'approved' : 'pending';
+      const accessGranted = accountType === 'vendor' ? 'vendor' : 'vendor';
+      await userProfileService.upsertProfile({
+        userId: user.id,
+        fullName,
+        roleTitle: role,
+        department,
+        teamSize,
+        requestedAccess: accountType,
+        status,
+        accessGranted,
+      });
+      await refreshProfile();
+      toast.success(
+        accountType === 'vendor'
+          ? 'Profile saved! You now have vendor access.'
+          : 'Request submitted. An admin will approve staff access shortly.'
+      );
+      navigate('/dashboard');
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to save onboarding details');
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -70,12 +103,20 @@ export function OnboardingPage() {
             </div>
           </div>
           <p className="text-sm text-neutral-500 mb-6">
-            {hasPending
-              ? 'Thanks for signing up! We just need a few quick details to tailor the workspace to you.'
-              : 'Already have an account? You can still update your preferences below.'}
+            Provide a few quick details so we can tailor the workspace and determine whether you should receive vendor or staff access.
           </p>
 
           <form className="space-y-5" onSubmit={handleSubmit}>
+            <div>
+              <label className="text-sm font-medium text-neutral-700 mb-2 block">Full Name</label>
+              <input
+                value={fullName}
+                onChange={(e) => setFullName(e.target.value)}
+                placeholder="Your name"
+                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#143352]"
+              />
+            </div>
+
             <div>
               <label className="text-sm font-medium text-neutral-700 mb-2 block">What best describes your role?</label>
               <select
@@ -116,35 +157,53 @@ export function OnboardingPage() {
             </div>
 
             <div>
-              <label className="text-sm font-medium text-neutral-700 mb-2 block">Top priorities right now</label>
-              <textarea
-                value={priorities}
-                onChange={(e) => setPriorities(e.target.value)}
-                rows={4}
-                placeholder="e.g. Speeding up approvals, tracking invoices, balancing workloads"
-                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#143352]"
-              />
+              <label className="text-sm font-medium text-neutral-700 mb-2 block">What type of access do you need?</label>
+              <div className="flex flex-col gap-3">
+                <label className={`border px-4 py-3 cursor-pointer ${accountType === 'vendor' ? 'border-[#143352]' : 'border-neutral-200'}`}>
+                  <input
+                    type="radio"
+                    name="accessType"
+                    value="vendor"
+                    checked={accountType === 'vendor'}
+                    onChange={() => setAccountType('vendor')}
+                    className="mr-3"
+                  />
+                  Vendor / Partner – limited access to assigned projects
+                </label>
+                <label className={`border px-4 py-3 cursor-pointer ${accountType === 'staff' ? 'border-[#143352]' : 'border-neutral-200'}`}>
+                  <input
+                    type="radio"
+                    name="accessType"
+                    value="staff"
+                    checked={accountType === 'staff'}
+                    onChange={() => setAccountType('staff')}
+                    className="mr-3"
+                  />
+                  Pelican State Staff – requires approval before full access
+                </label>
+              </div>
             </div>
 
             <button
               type="submit"
-              className="w-full bg-[#143352] text-white py-3 text-sm font-semibold hover:bg-[#0F1F2D] transition-colors"
+              disabled={submitting}
+              className="w-full bg-[#143352] text-white py-3 text-sm font-semibold hover:bg-[#0F1F2D] transition-colors disabled:opacity-50"
             >
-              Save My Preferences
+              {submitting ? 'Saving…' : 'Save My Preferences'}
             </button>
           </form>
 
           <div className="mt-6 flex items-center justify-between text-sm text-neutral-500">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4" />
-              <span>Your answers stay private to your workspace.</span>
+              <span>Admins approve staff requests inside the Members tab.</span>
             </div>
             <button
               type="button"
-              onClick={() => navigate('/login')}
+              onClick={() => navigate('/dashboard')}
               className="text-[#143352] hover:underline"
             >
-              Back to login
+              Return to dashboard
             </button>
           </div>
         </div>

@@ -199,6 +199,25 @@ CREATE TABLE IF NOT EXISTS invoices (
 );
 
 CREATE INDEX idx_invoices_work_request ON invoices(work_request_id);
+
+-- ============================================================================
+-- USER PROFILES TABLE (Onboarding + Access Control)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS user_profiles (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name TEXT,
+  role_title TEXT,
+  department TEXT,
+  team_size TEXT,
+  requested_access TEXT NOT NULL CHECK (requested_access IN ('vendor', 'staff')),
+  access_granted TEXT NOT NULL CHECK (access_granted IN ('vendor', 'staff')) DEFAULT 'vendor',
+  status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'denied')) DEFAULT 'pending',
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX idx_user_profiles_status ON user_profiles(status);
 CREATE INDEX idx_invoices_campus ON invoices(campus_id);
 CREATE INDEX idx_invoices_status ON invoices(status);
 CREATE INDEX idx_invoices_submitted ON invoices(submitted_at DESC);

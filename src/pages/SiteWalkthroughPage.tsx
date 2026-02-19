@@ -3,6 +3,7 @@ import { campusService, type Campus } from '../services/campusService';
 import { siteWalkthroughService } from '../services/siteWalkthroughService';
 import type { SiteWalkthrough, SiteFinding } from '../types';
 import { walkthroughSessionService } from '../services/walkthroughSessionService';
+import type { WalkthroughSessionRecord } from '../data/pipeline';
 import { useProfileData } from '../hooks/useProfileData';
 import { Link } from 'react-router-dom';
 import {
@@ -35,7 +36,7 @@ export function SiteWalkthroughPage() {
   const { leads: mockLeads } = useProfileData();
   const [campuses, setCampuses] = useState<Campus[]>([]);
   const [walkthroughs, setWalkthroughs] = useState<SiteWalkthrough[]>([]);
-  const [intakeSessions, setIntakeSessions] = useState<ReturnType<typeof walkthroughSessionService.list>>([]);
+  const [intakeSessions, setIntakeSessions] = useState<WalkthroughSessionRecord[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isScheduling, setIsScheduling] = useState(false);
   const [formData, setFormData] = useState({
@@ -58,10 +59,8 @@ export function SiteWalkthroughPage() {
       ]);
       setCampuses(campusData);
       setWalkthroughs(walkthroughData);
-      const sessionData = walkthroughSessionService
-        .list()
-        .sort((a, b) => new Date(a.scheduledDate).valueOf() - new Date(b.scheduledDate).valueOf());
-      setIntakeSessions(sessionData);
+      const sessionData = await walkthroughSessionService.list();
+      setIntakeSessions(sessionData.sort((a, b) => new Date(a.scheduledDate).valueOf() - new Date(b.scheduledDate).valueOf()));
       const draft = getSavedWalkthroughDraft();
       if (draft) {
         setFormData({
@@ -124,8 +123,7 @@ export function SiteWalkthroughPage() {
         scheduled_date: new Date(formData.scheduled_date).toISOString(),
         status: 'Scheduled',
         notes: formData.notes,
-        findings: [],
-      } as any);
+      });
       toast.success('Walkthrough scheduled');
       setFormData({ campus_id: '', scheduled_date: '', notes: '' });
       await loadData();

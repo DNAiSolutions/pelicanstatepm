@@ -30,6 +30,17 @@ export interface DashboardCampus {
   fundingSource?: string | null;
 }
 
+export interface DashboardProject {
+  id: string;
+  name: string;
+  clientName: string;
+  startDate: string;
+  endDate: string;
+  totalBudget: number;
+  spentBudget: number;
+  status: string;
+}
+
 export interface DashboardInvoice {
   id: string;
   invoiceNumber: string;
@@ -107,7 +118,7 @@ export async function fetchAdminWorkRequests(): Promise<DashboardWorkRequest[]> 
         priority,
         estimated_cost,
         campus_id,
-        campuses:campus_id (id, name, priority)
+        campuses(id, name, priority)
       `
     )
     .order('created_at', { ascending: false })
@@ -170,4 +181,26 @@ export async function fetchAdminInvoices(): Promise<DashboardInvoice[]> {
     submittedAt: row.submitted_at,
     paidAt: row.paid_at,
   } satisfies DashboardInvoice));
+}
+export async function fetchAdminProjects(): Promise<DashboardProject[]> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, name, client_name, start_date, end_date, total_budget, spent_budget, status')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []).map((row: any) => ({
+    id: row.id,
+    name: row.name,
+    clientName: row.client_name,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    totalBudget: Number(row.total_budget ?? 0),
+    spentBudget: Number(row.spent_budget ?? 0),
+    status: row.status,
+  } satisfies DashboardProject));
 }

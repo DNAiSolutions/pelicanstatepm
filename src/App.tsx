@@ -26,6 +26,7 @@ import { PortalProjectsPage } from './pages/PortalProjectsPage';
 import { PortalProjectDetailPage } from './pages/PortalProjectDetailPage';
 import { WalkthroughSessionPage } from './pages/WalkthroughSessionPage';
 import { OnboardingPage } from './pages/OnboardingPage';
+import { MembersPage } from './pages/MembersPage';
 
 function AppRoutes() {
   return (
@@ -35,7 +36,14 @@ function AppRoutes() {
       
       {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/onboarding" element={<OnboardingPage />} />
+      <Route
+        path="/onboarding"
+        element={
+          <ProtectedRoute requiresProfile={false}>
+            <OnboardingPage />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Protected Routes - with fallback */}
       <Route
@@ -76,7 +84,14 @@ function AppRoutes() {
         <Route path="/historic-documentation" element={<HistoricDocumentationPage />} />
         <Route path="/schedules" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Schedules (Coming Soon)</h1></div>} />
         <Route path="/analytics" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Analytics (Coming Soon)</h1></div>} />
-        <Route path="/members" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Members (Coming Soon)</h1></div>} />
+        <Route
+          path="/members"
+          element={
+            <ProtectedRoute allowedAccess={['staff']}>
+              <MembersPage />
+            </ProtectedRoute>
+          }
+        />
         <Route path="/settings" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Settings (Coming Soon)</h1></div>} />
       </Route>
 
