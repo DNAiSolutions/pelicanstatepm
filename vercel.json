@@ -1,10 +1,4 @@
 {
-<<<<<<< HEAD
-=======
-  "buildCommand": "npm --prefix \"./PelicanState/PM Dashboard/app\" run build",
-  "installCommand": "npm --prefix \"./PelicanState/PM Dashboard/app\" install",
-  "outputDirectory": "./PelicanState/PM Dashboard/app/dist",
->>>>>>> 2e43414c8ef09a64044d40bf670d3ad62293bc30
   "rewrites": [
     {
       "source": "/(.*)",
