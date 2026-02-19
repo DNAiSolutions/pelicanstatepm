@@ -25,6 +25,7 @@ import { PortalLandingPage } from './pages/PortalLandingPage';
 import { PortalProjectsPage } from './pages/PortalProjectsPage';
 import { PortalProjectDetailPage } from './pages/PortalProjectDetailPage';
 import { WalkthroughSessionPage } from './pages/WalkthroughSessionPage';
+import { OnboardingPage } from './pages/OnboardingPage';
 
 function AppRoutes() {
   return (
@@ -34,6 +35,7 @@ function AppRoutes() {
       
       {/* Public Routes */}
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/onboarding" element={<OnboardingPage />} />
 
       {/* Protected Routes - with fallback */}
       <Route

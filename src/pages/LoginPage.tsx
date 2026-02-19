@@ -29,8 +29,10 @@ export function LoginPage() {
         navigate('/dashboard');
       } else {
         await signUp(email, password);
-        toast.success('Account created! Check your email to confirm.');
-        setAuthMode('signin');
+        localStorage.setItem('pelican-onboarding-required', 'true');
+        toast.success('Account created! Tell us about your role.');
+        navigate('/onboarding');
+        return;
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
@@ -43,6 +45,7 @@ export function LoginPage() {
   const handleGoogleSignIn = async () => {
     try {
       setIsGoogleLoading(true);
+      localStorage.setItem('pelican-onboarding-required', 'true');
       toast('Redirecting to Google...', { icon: '🔐' });
       await signInWithGoogle();
     } catch (error) {
