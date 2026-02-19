@@ -49,4 +49,14 @@ export const authService = {
       callback(event, session);
     });
   },
+
+  async signInWithGoogle() {
+    const redirectTo = typeof window !== 'undefined' ? `${window.location.origin}/dashboard` : undefined;
+    return await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+      },
+    });
+  },
 };

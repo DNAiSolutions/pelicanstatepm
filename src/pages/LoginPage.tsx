@@ -7,9 +7,11 @@ import toast from 'react-hot-toast';
 export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [authMode, setAuthMode] = useState<'signin' | 'signup'>('signin');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const navigate = useNavigate();
-  const { signIn } = useAuth();
+  const { signIn, signUp, signInWithGoogle } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -20,15 +22,34 @@ export function LoginPage() {
     }
 
     try {
-      setIsLoading(true);
-      await signIn(email, password);
-      toast.success('Welcome back!');
-      navigate('/dashboard');
+      setIsSubmitting(true);
+      if (authMode === 'signin') {
+        await signIn(email, password);
+        toast.success('Welcome back!');
+        navigate('/dashboard');
+      } else {
+        await signUp(email, password);
+        toast.success('Account created! Check your email to confirm.');
+        setAuthMode('signin');
+      }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to sign in';
       toast.error(errorMessage);
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleGoogleSignIn = async () => {
+    try {
+      setIsGoogleLoading(true);
+      toast('Redirecting to Google...', { icon: '🔐' });
+      await signInWithGoogle();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to sign in with Google';
+      toast.error(errorMessage);
+    } finally {
+      setIsGoogleLoading(false);
     }
   };
 
@@ -63,8 +84,56 @@ export function LoginPage() {
 
           {/* Login Form */}
           <div className="bg-white border border-neutral-200 p-8">
-            <h2 className="text-2xl font-heading font-semibold text-[#1F2933] mb-2">Welcome back</h2>
-            <p className="text-neutral-500 mb-6">Please sign in to your account</p>
+            <div className="flex items-center gap-2 mb-6">
+              <button
+                type="button"
+                onClick={() => setAuthMode('signin')}
+                className={`px-4 py-2 text-sm font-medium border ${
+                  authMode === 'signin'
+                    ? 'bg-[#143352] text-white border-[#143352]'
+                    : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                }`}
+              >
+                Sign In
+              </button>
+              <button
+                type="button"
+                onClick={() => setAuthMode('signup')}
+                className={`px-4 py-2 text-sm font-medium border ${
+                  authMode === 'signup'
+                    ? 'bg-[#143352] text-white border-[#143352]'
+                    : 'border-neutral-200 text-neutral-600 hover:bg-neutral-50'
+                }`}
+              >
+                Create Account
+              </button>
+            </div>
+
+            <h2 className="text-2xl font-heading font-semibold text-[#1F2933] mb-2">
+              {authMode === 'signin' ? 'Welcome back' : 'Create an account'}
+            </h2>
+            <p className="text-neutral-500 mb-6">
+              {authMode === 'signin'
+                ? 'Please sign in to your account'
+                : 'Enter your details to get instant access'}
+            </p>
+
+            <div className="space-y-4 mb-6">
+              <button
+                type="button"
+                onClick={handleGoogleSignIn}
+                disabled={isGoogleLoading}
+                className="w-full border border-neutral-200 py-2.5 flex items-center justify-center gap-3 text-sm font-medium hover:bg-neutral-50 transition-colors disabled:opacity-50"
+              >
+                <svg className="w-5 h-5" viewBox="0 0 24 24" aria-hidden="true">
+                  <path
+                    d="M21.35 11.1h-9.18v2.92h5.3c-.23 1.5-1.8 4.41-5.3 4.41-3.19 0-5.79-2.64-5.79-5.9s2.6-5.9 5.79-5.9c1.82 0 3.04.77 3.74 1.43l2.55-2.46C17.02 3.77 15.03 2.8 12.17 2.8 6.9 2.8 2.6 7.11 2.6 12.43S6.9 22.06 12.17 22.06c6.2 0 10.28-4.35 10.28-10.47 0-.7-.07-1.24-.1-1.49Z"
+                    fill="currentColor"
+                  />
+                </svg>
+                {isGoogleLoading ? 'Connecting...' : 'Continue with Google'}
+              </button>
+            </div>
 
             <form onSubmit={handleSubmit} className="space-y-6">
               {/* Email Field */}
@@ -81,7 +150,7 @@ export function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@pelicanstate.org"
                     className="w-full pl-10 pr-4 py-3 border border-neutral-200 bg-white text-[#1F2933] placeholder-neutral-400 focus:outline-none focus:border-[#143352] transition-colors"
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -100,7 +169,7 @@ export function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="Enter your password"
                     className="w-full pl-10 pr-4 py-3 border border-neutral-200 bg-white text-[#1F2933] placeholder-neutral-400 focus:outline-none focus:border-[#143352] transition-colors"
-                    disabled={isLoading}
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -108,10 +177,16 @@ export function LoginPage() {
               {/* Submit Button */}
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isSubmitting}
                 className="w-full bg-[#143352] hover:bg-[#0F1F2D] text-white py-3 font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {isLoading ? 'Signing in...' : 'Sign In'}
+                {isSubmitting
+                  ? authMode === 'signin'
+                    ? 'Signing in...'
+                    : 'Creating account...'
+                  : authMode === 'signin'
+                  ? 'Sign In'
+                  : 'Create Account'}
               </button>
             </form>
 
@@ -120,8 +195,12 @@ export function LoginPage() {
               <div className="flex gap-3">
                 <AlertCircle className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-blue-800">
-                  <p className="font-medium mb-1">Demo Access</p>
-                  <p className="text-blue-600">Use your registered email and password to access the dashboard.</p>
+                  <p className="font-medium mb-1">{authMode === 'signin' ? 'Demo Access' : 'Need Google?'}</p>
+                  <p className="text-blue-600">
+                    {authMode === 'signin'
+                      ? 'Use your registered email and password or sign in with Google to access the dashboard.'
+                      : 'You can also continue with Google to automatically create and sign in to your account.'}
+                  </p>
                 </div>
               </div>
             </div>

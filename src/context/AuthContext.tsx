@@ -15,6 +15,7 @@ export interface AuthContextType {
   error: string | null;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string) => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
   switchProfile: (profile: 'demo' | 'admin') => void;
@@ -59,21 +60,57 @@ const ADMIN_USER: AuthUser = {
 };
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Initialize with user profile from localStorage, defaulting to demo
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    // Load preferred profile from localStorage
-    const savedProfile = localStorage.getItem('auth-profile') || 'demo';
-    let selectedUser = DEMO_USER;
-    if (savedProfile === 'admin') {
-      selectedUser = ADMIN_USER;
+    let isMounted = true;
+
+    async function initializeProfile() {
+      try {
+        const currentUser = await authService.getCurrentUser();
+        if (currentUser && isMounted) {
+          setUser({
+            ...currentUser,
+            role: 'Owner',
+            campusAssigned: currentUser.user_metadata?.campusAssigned ?? [],
+          });
+          setLoading(false);
+          return;
+        }
+      } catch (initError) {
+        console.warn('AuthProvider: No Supabase session detected, falling back to demo profiles');
+      }
+
+      if (!isMounted) return;
+      const savedProfile = localStorage.getItem('auth-profile') || 'demo';
+      const selectedUser = savedProfile === 'admin' ? ADMIN_USER : DEMO_USER;
+      setUser(selectedUser);
+      setLoading(false);
+      console.log(`AuthProvider: Loaded ${savedProfile} profile (${selectedUser.email})`);
     }
-    setUser(selectedUser);
-    setLoading(false);
-    console.log(`AuthProvider: Loaded ${savedProfile} profile (${selectedUser.email})`);
+
+    initializeProfile();
+
+    const { data: authListener } = authService.onAuthStateChange((event, session) => {
+      if (!isMounted) return;
+      if (event === 'SIGNED_IN' && session?.user) {
+        setUser({
+          ...session.user,
+          role: 'Owner',
+          campusAssigned: session.user.user_metadata?.campusAssigned ?? [],
+        });
+      }
+      if (event === 'SIGNED_OUT') {
+        setUser(null);
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      authListener?.subscription?.unsubscribe();
+    };
   }, []);
 
   const isAuthenticated = user !== null;
@@ -90,6 +127,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           role: 'Owner',
           campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
         });
+        localStorage.removeItem('auth-profile');
       } else {
         throw new Error('Failed to sign in');
       }
@@ -108,8 +146,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setLoading(true);
       const result = await authService.signUp(email, password) as any;
       if (result?.error) throw result.error;
+      localStorage.removeItem('auth-profile');
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign up failed';
+      setError(message);
+      throw err;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const signInWithGoogle = async () => {
+    try {
+      setError(null);
+      setLoading(true);
+      await authService.signInWithGoogle();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Google sign in failed';
       setError(message);
       throw err;
     } finally {
@@ -145,6 +198,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     error,
     signIn,
     signUp,
+    signInWithGoogle,
     signOut,
     isAuthenticated,
     switchProfile,
