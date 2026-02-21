@@ -3,7 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { leadService } from '../services/leadService';
 import { walkthroughSessionService } from '../services/walkthroughSessionService';
-import { aiWalkthroughPlannerService } from '../services/aiWalkthroughPlannerService';
+import { aiService } from '../services/aiService';
 import { projectTaskService } from '../services/projectTaskService';
 import { projectService } from '../services/projectService';
 import type { Lead, WalkthroughPlan } from '../data/pipeline';
@@ -19,28 +19,51 @@ export function WalkthroughSessionPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     async function load() {
       if (!leadId) return;
-      const data = await leadService.getById(leadId);
-      if (!data) {
-        toast.error('Lead not found');
+      try {
+        const data = await leadService.getById(leadId);
+        if (!data) {
+          toast.error('Lead not found');
+          navigate('/leads');
+          return;
+        }
+        if (!isMounted) return;
+        setLead(data);
+        const session = await walkthroughSessionService.ensureSession(leadId, {
+          date: data.walkthroughDate || new Date().toISOString(),
+          notes: data.walkthroughNotes,
+          projectId: data.projectId,
+          propertyId: data.propertyId,
+        });
+        if (!isMounted) return;
+        setSessionId(session.id);
+        if (session.aiPlan) {
+          setPlan(session.aiPlan);
+        } else {
+          const summary = data.walkthroughPrepBrief?.summary || data.intakeMetadata?.issueSummary || data.notes || '';
+          const prepBrief = data.walkthroughPrepBrief || aiService.walkthroughPlanner.generatePrepBrief(summary);
+          const generated = aiService.walkthroughPlanner.generateWalkthroughPlan(
+            data.projectType || 'General Construction',
+            prepBrief
+          );
+          await walkthroughSessionService.attachPlan(session.id, generated);
+          if (!isMounted) return;
+          setPlan(generated);
+        }
+      } catch (error) {
+        console.error(error);
+        toast.error('Unable to load walkthrough session');
         navigate('/leads');
-        return;
+      } finally {
+        if (isMounted) setLoading(false);
       }
-      setLead(data);
-      const session = walkthroughSessionService.ensureSession(leadId, data.walkthroughDate || new Date().toISOString());
-      setSessionId(session.id);
-      if (session.aiPlan) {
-        setPlan(session.aiPlan);
-      } else {
-        const prepBrief = data.walkthroughPrepBrief || aiWalkthroughPlannerService.generatePrepBrief(data.intakeMetadata?.issueSummary || '');
-        const generated = aiWalkthroughPlannerService.generateWalkthroughPlan(data.projectType || 'General Construction', prepBrief);
-        walkthroughSessionService.attachPlan(session.id, generated);
-        setPlan(generated);
-      }
-      setLoading(false);
     }
     load();
+    return () => {
+      isMounted = false;
+    };
   }, [leadId, navigate]);
 
   const checklist = useMemo(() => plan?.checklist || [], [plan]);
@@ -54,46 +77,63 @@ export function WalkthroughSessionPage() {
       toast.error('Missing walkthrough data');
       return;
     }
-    walkthroughSessionService.complete(sessionId, responses);
-    const session = walkthroughSessionService.getById(sessionId);
-    const finalizedPlan = session?.finalizedPlan ?? plan;
-    const notes = Object.entries(responses)
-      .map(([question, answer]) => `${question}: ${answer}`)
-      .join('\n');
+    try {
+      await walkthroughSessionService.complete(sessionId, responses);
+      const updatedSession = await walkthroughSessionService.getById(sessionId);
+      const finalizedPlan = updatedSession?.finalizedPlan ?? plan;
+      const notes = Object.entries(responses)
+        .map(([question, answer]) => `${question}: ${answer}`)
+        .join('\n');
 
-    await leadService.update(lead.id, {
-      stage: 'Qualified',
-      walkthroughPlan: finalizedPlan,
-      walkthroughNotes: notes,
-    });
-
-    if (lead.projectId) {
-      const project = await projectService.getProject(lead.projectId);
-      const siteId = project?.siteId;
-      finalizedPlan.steps.forEach((step) => {
-        projectTaskService.createTask(lead.projectId!, {
-          title: `Walkthrough · ${step.title}`,
-          description: `${step.instructions}\nTrades: ${step.trades.join(', ')}\nMaterials: ${step.materials.join(', ')}`,
-          status: 'Requested',
-          priority: 'Medium',
-          category: 'Planning',
-          siteId,
-        });
-      });
-      await projectService.updateProject(lead.projectId, {
+      await leadService.update(lead.id, {
+        stage: 'Qualified',
         walkthroughPlan: finalizedPlan,
         walkthroughNotes: notes,
       });
-    }
 
-    toast.success('Walkthrough finalized and added to plan');
-    navigate('/leads');
+      if (lead.projectId) {
+        const project = await projectService.getProject(lead.projectId);
+        const siteId = project?.siteId;
+        finalizedPlan.steps.forEach((step) => {
+          projectTaskService.createTask(lead.projectId!, {
+            title: `Walkthrough · ${step.title}`,
+            description: `${step.instructions}\nTrades: ${step.trades.join(', ')}\nMaterials: ${step.materials.join(', ')}`,
+            status: 'Requested',
+            priority: 'Medium',
+            category: 'Planning',
+            siteId,
+          });
+        });
+        await projectService.updateProject(lead.projectId, {
+          walkthroughPlan: finalizedPlan,
+          walkthroughNotes: notes,
+        });
+      }
+
+      toast.success('Walkthrough finalized and added to plan');
+      navigate('/leads');
+    } catch (error) {
+      console.error(error);
+      toast.error('Unable to finalize walkthrough');
+    }
+  };
+
+  const handleRegeneratePlan = async () => {
+    if (!lead) return;
+    const summary = lead.walkthroughPrepBrief?.summary || lead.intakeMetadata?.issueSummary || lead.notes || '';
+    const prep = lead.walkthroughPrepBrief || aiService.walkthroughPlanner.generatePrepBrief(summary);
+    const updated = aiService.walkthroughPlanner.generateWalkthroughPlan(lead.projectType || 'General Construction', prep);
+    setPlan(updated);
+    if (sessionId) {
+      await walkthroughSessionService.attachPlan(sessionId, updated);
+    }
+    toast.success('Plan regenerated');
   };
 
   if (loading || !lead || !plan) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-12 h-12 border-4 border-[#143352]/20 border-t-[#143352] rounded-full animate-spin" />
+        <div className="w-12 h-12 border-4 border-[#0f2749]/20 border-t-[#0f2749] rounded-full animate-spin" />
       </div>
     );
   }
@@ -136,13 +176,9 @@ export function WalkthroughSessionPage() {
           <h2 className="text-lg font-heading font-semibold text-neutral-900">AI Walkthrough Plan</h2>
           <button
             onClick={() => {
-              const prep = lead.walkthroughPrepBrief || aiWalkthroughPlannerService.generatePrepBrief(lead.intakeMetadata?.issueSummary || '');
-              const updated = aiWalkthroughPlannerService.generateWalkthroughPlan(lead.projectType || 'General Construction', prep);
-              setPlan(updated);
-              if (sessionId) walkthroughSessionService.attachPlan(sessionId, updated);
-              toast.success('Plan regenerated');
+              void handleRegeneratePlan();
             }}
-            className="text-sm text-[#143352] border border-[#143352] px-3 py-1"
+            className="text-sm text-[#0f2749] border border-[#0f2749] px-3 py-1"
           >
             Regenerate Plan
           </button>
@@ -204,7 +240,7 @@ export function WalkthroughSessionPage() {
         <button onClick={() => navigate('/leads')} className="px-4 py-2 border border-neutral-300 text-neutral-600">
           Cancel
         </button>
-        <button onClick={handleFinalize} className="px-4 py-2 bg-[#143352] text-white">
+        <button onClick={handleFinalize} className="px-4 py-2 bg-[#0f2749] text-white">
           Finalize Walkthrough
         </button>
       </div>

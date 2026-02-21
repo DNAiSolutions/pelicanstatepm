@@ -103,7 +103,7 @@ export function WorkRequestSidebar({
               {requestedBy.avatarUrl ? (
                 <img src={requestedBy.avatarUrl} alt="" className="w-8 h-8 rounded-full" />
               ) : (
-                <div className="w-8 h-8 rounded-full bg-[#143352] flex items-center justify-center text-white text-sm">
+                <div className="w-8 h-8 rounded-full bg-[#0f2749] flex items-center justify-center text-white text-sm">
                   {requestedBy.name.charAt(0)}
                 </div>
               )}

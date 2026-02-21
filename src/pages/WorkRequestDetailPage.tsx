@@ -30,7 +30,7 @@ import {
   getProjectById,
   getUserById,
   getVendorById,
-  getCampusById,
+  getPropertyById,
   canSchedule,
   canMarkComplete,
   canGenerateInvoice,
@@ -39,6 +39,9 @@ import {
   type WorkLog,
   type WorkOrderStatus,
 } from '../data/pipeline';
+import { workRequestService } from '../services/workRequestService';
+import { contactService } from '../services/contactService';
+import type { WorkRequest, Contact } from '../types';
 
 import { HistoricDocumentation, type HistoricDoc } from '../components/HistoricDocumentation';
 
@@ -67,10 +70,27 @@ export function WorkRequestDetailPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [showHistoricDocs, setShowHistoricDocs] = useState(false);
+  const [supabaseRequest, setSupabaseRequest] = useState<WorkRequest | null>(null);
+  const [supabaseContact, setSupabaseContact] = useState<Contact | null>(null);
 
   useEffect(() => {
     loadData();
   }, [id]);
+
+  const loadSupabaseRequest = async (requestId: string) => {
+    const request = await workRequestService.getWorkRequest(requestId);
+    setSupabaseRequest(request);
+    if (request?.client_contact_id) {
+      try {
+        const contact = await contactService.getById(request.client_contact_id);
+        if (contact) {
+          setSupabaseContact(contact);
+        }
+      } catch (error) {
+        console.warn('Unable to load request contact', error);
+      }
+    }
+  };
 
   const loadData = async () => {
     if (!id) {
@@ -80,15 +100,18 @@ export function WorkRequestDetailPage() {
 
     try {
       setIsLoading(true);
-      // Use mock data from pipeline
+      setSupabaseRequest(null);
+      setSupabaseContact(null);
       const wo = getWorkOrderById(id);
       if (wo) {
         setWorkOrder(wo);
         setQuotes(getQuotesByWorkOrderId(id));
         setWorkLogs(getWorkLogsByWorkOrderId(id));
       } else {
-        toast.error('Work order not found');
-        navigate('/work-requests');
+        setWorkOrder(null);
+        setQuotes([]);
+        setWorkLogs([]);
+        await loadSupabaseRequest(id);
       }
     } catch (error) {
       console.error('Failed to load:', error);
@@ -111,7 +134,7 @@ export function WorkRequestDetailPage() {
   // Get related data
   const site = workOrder ? getSiteById(workOrder.siteId) : null;
   const project = workOrder ? getProjectById(workOrder.projectId) : null;
-  const campus = site ? getCampusById(site.campusId) : null;
+  const property = site ? getPropertyById(site.propertyId) : null;
   const requestedBy = workOrder ? getUserById(workOrder.requestedById) : null;
   const assignedVendor = workOrder?.assignedVendorId ? getVendorById(workOrder.assignedVendorId) : null;
   const approvedQuote = workOrder ? getApprovedQuote(workOrder.id) : null;
@@ -239,10 +262,20 @@ export function WorkRequestDetailPage() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#143352]/20 border-t-[#143352] rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-[#0f2749]/20 border-t-[#0f2749] rounded-full animate-spin mx-auto mb-4" />
           <p className="text-neutral-600">Loading work order...</p>
         </div>
       </div>
+    );
+  }
+
+  if (supabaseRequest) {
+    return (
+      <SupabaseRequestDetails
+        request={supabaseRequest}
+        contact={supabaseContact || undefined}
+        onBack={() => navigate('/work-requests')}
+      />
     );
   }
 
@@ -263,7 +296,7 @@ export function WorkRequestDetailPage() {
       <div className="mb-8">
         <button
           onClick={() => navigate('/work-requests')}
-          className="flex items-center gap-2 text-[#143352] hover:text-[#143352]/80 mb-4"
+          className="flex items-center gap-2 text-[#0f2749] hover:text-[#0f2749]/80 mb-4"
         >
           <ChevronLeft className="w-5 h-5" />
           Back to Work Requests
@@ -286,7 +319,7 @@ export function WorkRequestDetailPage() {
             </div>
             <p className="text-xl text-neutral-700">{workOrder.title}</p>
             <p className="text-neutral-500 mt-1">
-              {site?.name} - {campus?.name}
+              {site?.name} - {property?.name}
             </p>
           </div>
           <button
@@ -309,7 +342,7 @@ export function WorkRequestDetailPage() {
                   <div
                     className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium ${
                       isCurrent
-                        ? 'bg-[#143352] text-white'
+                        ? 'bg-[#0f2749] text-white'
                         : isPast
                         ? 'bg-green-500 text-white'
                         : 'bg-gray-200 text-gray-500'
@@ -319,7 +352,7 @@ export function WorkRequestDetailPage() {
                   </div>
                   <span
                     className={`ml-2 text-xs ${
-                      isCurrent ? 'text-[#143352] font-medium' : isPast ? 'text-green-600' : 'text-gray-400'
+                      isCurrent ? 'text-[#0f2749] font-medium' : isPast ? 'text-green-600' : 'text-gray-400'
                     }`}
                   >
                     {status.replace(/([A-Z])/g, ' $1').trim()}
@@ -351,7 +384,7 @@ export function WorkRequestDetailPage() {
               }}
               className={`flex items-center gap-2 px-4 py-3 font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-[#143352] text-[#143352]'
+                  ? 'border-[#0f2749] text-[#0f2749]'
                   : tab.locked
                   ? 'border-transparent text-neutral-400 cursor-not-allowed'
                   : 'border-transparent text-neutral-600 hover:text-neutral-900'
@@ -415,7 +448,7 @@ export function WorkRequestDetailPage() {
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-gray-200 h-2 rounded-full">
                           <div
-                            className="bg-[#143352] h-2 rounded-full"
+                            className="bg-[#0f2749] h-2 rounded-full"
                             style={{ width: `${workOrder.percentComplete}%` }}
                           />
                         </div>
@@ -501,7 +534,7 @@ export function WorkRequestDetailPage() {
                                 href={url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-sm text-[#143352] hover:underline flex items-center gap-1"
+                                className="text-sm text-[#0f2749] hover:underline flex items-center gap-1"
                               >
                                 <Camera className="w-3 h-3" />
                                 Attachment {i + 1}
@@ -521,9 +554,9 @@ export function WorkRequestDetailPage() {
           {activeTab === 'quotes' && (
             <div className="space-y-6">
               <div className="flex items-center justify-between">
-                <h2 className="text-xl font-heading font-bold text-neutral-900">Quotes & Estimates</h2>
+                <h2 className="text-xl font-heading font-bold text-neutral-900">Quotes</h2>
                 <button
-                  onClick={() => navigate(`/estimates/new/${workOrder.id}`)}
+                  onClick={() => navigate(`/quotes/new/${workOrder.id}`)}
                   className="btn-primary text-sm"
                 >
                   New Quote
@@ -535,7 +568,7 @@ export function WorkRequestDetailPage() {
                   <DollarSign className="w-12 h-12 text-neutral-300 mx-auto mb-4" />
                   <p className="text-neutral-500 mb-4">No quotes created yet.</p>
                   <button
-                    onClick={() => navigate(`/estimates/new/${workOrder.id}`)}
+                    onClick={() => navigate(`/quotes/new/${workOrder.id}`)}
                     className="btn-primary"
                   >
                     Create First Quote
@@ -643,7 +676,7 @@ export function WorkRequestDetailPage() {
                     <input
                       type="date"
                       defaultValue={workOrder.targetStartDate}
-                      className="w-full px-3 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#143352]"
+                      className="w-full px-3 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0f2749]"
                     />
                   </div>
                   <div>
@@ -651,7 +684,7 @@ export function WorkRequestDetailPage() {
                     <input
                       type="date"
                       defaultValue={workOrder.targetEndDate}
-                      className="w-full px-3 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#143352]"
+                      className="w-full px-3 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0f2749]"
                     />
                   </div>
                 </div>
@@ -660,7 +693,7 @@ export function WorkRequestDetailPage() {
                   <label className="block text-sm font-medium text-neutral-700 mb-1">Assigned Vendor</label>
                   <select
                     defaultValue={workOrder.assignedVendorId || ''}
-                    className="w-full px-3 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#143352]"
+                    className="w-full px-3 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0f2749]"
                   >
                     <option value="">Select a vendor...</option>
                     {mockVendors.map((v) => (
@@ -716,7 +749,7 @@ export function WorkRequestDetailPage() {
                     <input
                       type="checkbox"
                       checked={workOrder.completionChecklistDone}
-                      className="w-5 h-5 text-[#143352]"
+                      className="w-5 h-5 text-[#0f2749]"
                       readOnly
                     />
                     <span className="text-neutral-900">Work completed per scope and specifications</span>
@@ -725,17 +758,17 @@ export function WorkRequestDetailPage() {
                     <input
                       type="checkbox"
                       checked={workOrder.completionPhotoUrls.length > 0}
-                      className="w-5 h-5 text-[#143352]"
+                      className="w-5 h-5 text-[#0f2749]"
                       readOnly
                     />
                     <span className="text-neutral-900">Completion photos uploaded</span>
                   </label>
                   <label className="flex items-center gap-3 p-3 border border-neutral-200 cursor-pointer hover:bg-neutral-50">
-                    <input type="checkbox" className="w-5 h-5 text-[#143352]" readOnly />
+                    <input type="checkbox" className="w-5 h-5 text-[#0f2749]" readOnly />
                     <span className="text-neutral-900">Site cleaned and restored</span>
                   </label>
                   <label className="flex items-center gap-3 p-3 border border-neutral-200 cursor-pointer hover:bg-neutral-50">
-                    <input type="checkbox" className="w-5 h-5 text-[#143352]" readOnly />
+                    <input type="checkbox" className="w-5 h-5 text-[#0f2749]" readOnly />
                     <span className="text-neutral-900">Client walkthrough completed</span>
                   </label>
                 </div>
@@ -778,7 +811,7 @@ export function WorkRequestDetailPage() {
                     <h3 className="font-bold text-neutral-900">Historic Compliance</h3>
                     <button
                       onClick={() => setShowHistoricDocs(!showHistoricDocs)}
-                      className="text-sm text-[#143352] hover:underline"
+                      className="text-sm text-[#0f2749] hover:underline"
                     >
                       {showHistoricDocs ? 'Hide' : 'Show'} Documentation Form
                     </button>
@@ -903,7 +936,7 @@ export function WorkRequestDetailPage() {
                   {requestedBy.avatarUrl ? (
                     <img src={requestedBy.avatarUrl} alt="" className="w-8 h-8 rounded-full" />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-[#143352] flex items-center justify-center text-white text-sm">
+                    <div className="w-8 h-8 rounded-full bg-[#0f2749] flex items-center justify-center text-white text-sm">
                       {requestedBy.name.charAt(0)}
                     </div>
                   )}
@@ -936,7 +969,7 @@ export function WorkRequestDetailPage() {
               )}
               {workOrder.status === 'Scoped' && (
                 <button
-                  onClick={() => navigate(`/estimates/new/${workOrder.id}`)}
+                  onClick={() => navigate(`/quotes/new/${workOrder.id}`)}
                   className="w-full btn-primary py-2 text-sm"
                 >
                   Create Quote
@@ -974,6 +1007,266 @@ export function WorkRequestDetailPage() {
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+type IntakePayload = {
+  serviceDetails?: string;
+  availability?: {
+    primaryDate?: string;
+    alternateDate?: string;
+    windows?: string[];
+  };
+  attachments?: string[];
+  imageLinks?: string[];
+  onsiteNotes?: string;
+  lineItems?: Array<{ id?: string; name?: string; quantity?: number; unitPrice?: number }>;
+  notes?: string;
+  supplementalFiles?: string[];
+  submittedBy?: string;
+  submittedVia?: string;
+};
+
+function SupabaseRequestDetails({
+  request,
+  contact,
+  onBack,
+}: {
+  request: WorkRequest;
+  contact?: Contact;
+  onBack: () => void;
+}) {
+  const intake = (request.intake_payload ?? {}) as IntakePayload;
+  const attachments = Array.from(
+    new Set([...(intake.attachments ?? []), ...(intake.imageLinks ?? [])])
+  ).filter(Boolean);
+  const supplemental = (intake.supplementalFiles ?? []).filter(Boolean);
+  const lineItems = Array.isArray(intake.lineItems) ? intake.lineItems : [];
+  const lineItemsTotal = lineItems.reduce(
+    (sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0),
+    0
+  );
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      maximumFractionDigits: 0,
+    }).format(value);
+  const availability = intake.availability || {};
+  const statusClass: Record<string, string> = {
+    Intake: 'bg-slate-100 text-slate-700',
+    Scoping: 'bg-blue-100 text-blue-700',
+    Estimate: 'bg-sky-100 text-sky-800',
+    Approval: 'bg-amber-100 text-amber-800',
+    Schedule: 'bg-cyan-100 text-cyan-800',
+    Progress: 'bg-blue-100 text-blue-800',
+    Complete: 'bg-green-100 text-green-800',
+    Invoice: 'bg-purple-100 text-purple-800',
+    Paid: 'bg-emerald-100 text-emerald-800',
+  };
+
+  return (
+    <div className="p-8 max-w-5xl mx-auto space-y-6">
+      <button
+        onClick={onBack}
+        className="flex items-center gap-2 text-[#0f2749] hover:text-[#0f2749]/80"
+      >
+        <ChevronLeft className="w-5 h-5" /> Back to Work Requests
+      </button>
+
+      <section className="card p-6 space-y-3">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Request</p>
+            <h1 className="text-3xl font-heading font-bold text-neutral-900">
+              {request.request_number || 'New request'}
+            </h1>
+            <p className="text-neutral-600">{request.property}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              className={`px-3 py-1 text-xs font-medium rounded-full ${
+                statusClass[request.status] ?? 'bg-slate-100 text-slate-700'
+              }`}
+            >
+              {request.status}
+            </span>
+            <span className="px-3 py-1 text-xs font-medium rounded-full border text-neutral-700">
+              {request.priority || 'Medium'} priority
+            </span>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-neutral-600">
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Submitted via</p>
+            <p className="text-neutral-900 font-medium">{request.submitted_via || 'Internal'}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Submitted on</p>
+            <p className="text-neutral-900 font-medium">
+              {request.created_at ? new Date(request.created_at).toLocaleString() : '—'}
+            </p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Submitted by</p>
+            <p className="text-neutral-900 font-medium">{intake.submittedBy || contact?.name || '—'}</p>
+          </div>
+          <div>
+            <p className="text-xs uppercase tracking-[0.2em] text-neutral-500">Estimated value</p>
+            <p className="text-neutral-900 font-medium">
+              {request.estimated_cost ? formatCurrency(Number(request.estimated_cost)) : 'TBD'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {contact && (
+        <section className="card p-6 space-y-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Client contact</p>
+          <h3 className="text-xl font-heading text-neutral-900">{contact.name}</h3>
+          <p className="text-sm text-neutral-600">{contact.company}</p>
+          <div className="text-sm text-neutral-600 space-y-1">
+            <p>{contact.email}</p>
+            <p>{contact.phone}</p>
+          </div>
+        </section>
+      )}
+
+      <section className="card p-6 space-y-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Service overview</p>
+          <h2 className="text-xl font-heading text-neutral-900">{request.title || request.description}</h2>
+        </div>
+        <div className="space-y-3 text-neutral-700">
+          <div>
+            <p className="text-sm text-neutral-500">Description</p>
+            <p>{request.description || 'No description provided'}</p>
+          </div>
+          {request.scope_of_work && (
+            <div>
+              <p className="text-sm text-neutral-500">Scope of work</p>
+              <p>{request.scope_of_work}</p>
+            </div>
+          )}
+          {intake.serviceDetails && (
+            <div>
+              <p className="text-sm text-neutral-500">Client notes</p>
+              <p>{intake.serviceDetails}</p>
+            </div>
+          )}
+          {intake.onsiteNotes && (
+            <div>
+              <p className="text-sm text-neutral-500">On-site assessment</p>
+              <p>{intake.onsiteNotes}</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      <section className="card p-6 space-y-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Availability</p>
+          <h2 className="text-lg font-heading text-neutral-900">Preferred walkthrough windows</h2>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-neutral-600">
+          <div>
+            <p className="text-neutral-500 text-xs uppercase tracking-[0.2em]">Primary date</p>
+            <p className="text-neutral-900 font-medium">{availability.primaryDate || 'Anytime'}</p>
+          </div>
+          <div>
+            <p className="text-neutral-500 text-xs uppercase tracking-[0.2em]">Alternate date</p>
+            <p className="text-neutral-900 font-medium">{availability.alternateDate || 'Flexible'}</p>
+          </div>
+          <div>
+            <p className="text-neutral-500 text-xs uppercase tracking-[0.2em]">Windows</p>
+            <p className="text-neutral-900 font-medium">
+              {availability.windows && availability.windows.length
+                ? availability.windows.join(', ')
+                : 'Any'}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      {lineItems.length > 0 && (
+        <section className="card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Products / Services</p>
+              <h2 className="text-lg font-heading text-neutral-900">Requested line items</h2>
+            </div>
+            <p className="text-sm text-neutral-600">Subtotal {formatCurrency(lineItemsTotal)}</p>
+          </div>
+          <table className="w-full text-sm">
+            <thead className="text-neutral-500">
+              <tr>
+                <th className="text-left py-2">Name</th>
+                <th className="text-right py-2">Qty</th>
+                <th className="text-right py-2">Unit price</th>
+                <th className="text-right py-2">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              {lineItems.map((item, index) => {
+                const quantity = Number(item.quantity) || 0;
+                const unitPrice = Number(item.unitPrice) || 0;
+                const total = quantity * unitPrice;
+                return (
+                  <tr key={item.id || `${index}-${item.name}`} className="border-t border-neutral-100">
+                    <td className="py-2 text-neutral-900">{item.name || 'Line item'}</td>
+                    <td className="py-2 text-right text-neutral-600">{quantity}</td>
+                    <td className="py-2 text-right text-neutral-600">{formatCurrency(unitPrice)}</td>
+                    <td className="py-2 text-right font-medium text-neutral-900">{formatCurrency(total)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </section>
+      )}
+
+      {(attachments.length > 0 || supplemental.length > 0) && (
+        <section className="card p-6 space-y-3">
+          <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Files & photos</p>
+          {attachments.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-neutral-900 mb-2">Uploaded images</p>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-neutral-700">
+                {attachments.map((url) => (
+                  <li key={url}>
+                    <a href={url} target="_blank" rel="noreferrer" className="text-[#0f2749] underline">
+                      {url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {supplemental.length > 0 && (
+            <div>
+              <p className="text-sm font-medium text-neutral-900 mb-2">Supplemental files</p>
+              <ul className="list-disc pl-5 space-y-1 text-sm text-neutral-700">
+                {supplemental.map((url) => (
+                  <li key={url}>
+                    <a href={url} target="_blank" rel="noreferrer" className="text-[#0f2749] underline">
+                      {url}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </section>
+      )}
+
+      {(intake.notes || request.inspection_notes) && (
+        <section className="card p-6 space-y-2">
+          <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Internal notes</p>
+          {intake.notes && <p className="text-neutral-700">{intake.notes}</p>}
+          {request.inspection_notes && <p className="text-neutral-700">{request.inspection_notes}</p>}
+        </section>
+      )}
     </div>
   );
 }

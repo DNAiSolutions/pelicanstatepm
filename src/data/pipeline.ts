@@ -95,7 +95,7 @@ export interface WalkthroughSessionRecord {
   id: string;
   leadId: string;
   projectId?: string;
-  campusId?: string;
+  propertyId?: string;
   scheduledDate: string;
   status: 'Scheduled' | 'InProgress' | 'Complete';
   notes?: string;
@@ -214,7 +214,7 @@ export interface WbsPhase {
 
 export interface Site {
   id: string;
-  campusId: string;
+  propertyId: string;
   name: string;
   address: string;
   isHistoric: boolean;
@@ -225,7 +225,7 @@ export interface Project {
   id: string;
   name: string;
   siteId: string;
-  campusId?: string;
+  propertyId?: string;
   clientName: string;
   clientPhone: string;
   clientEmail: string;
@@ -253,7 +253,7 @@ export interface Contact {
   type: ContactType;
   email: string;
   phone: string;
-  campusId?: string;
+  propertyId?: string;
   projectIds: string[];
   leadIds: string[];
   preferredChannel?: 'Email' | 'Phone' | 'Text';
@@ -300,7 +300,7 @@ export interface Lead {
   estimatedValue: number;
   nextStep?: string;
   notes?: string;
-  campusId?: string;
+  propertyId?: string;
   projectId?: string;
   contactIds: string[];
   createdAt: string;
@@ -347,7 +347,7 @@ export interface LeadIntakeRecord {
     contactName: string;
     email: string;
     phone: string;
-    campusId?: string;
+    propertyId?: string;
     issueSummary: string;
     jobAddress?: string;
     urgency?: Priority;
@@ -425,6 +425,7 @@ export interface HistoricCompliance {
 export interface QuoteLineItem {
   id: string;
   description: string;
+  detail?: string;
   laborClass: string;
   quantity: number;
   unitCost: number;
@@ -460,8 +461,9 @@ export interface WorkLog {
 }
 
 export interface InvoiceLineItem {
-  id: string;
+  id?: string;
   workOrderId: string;
+  unit?: string;
   quoteLineItemId?: string;
   description: string;
   location: string;
@@ -476,7 +478,7 @@ export interface Invoice {
   invoiceNumber: string;
   projectId: string;
   contractId?: string;
-  campusId: string;
+  propertyId: string;
   fundingCode: string;
   primeVendorId: string;
   workOrderIds: string[];
@@ -693,23 +695,23 @@ export const mockVendors: Vendor[] = [
   { id: 'vendor-3', name: 'Gulf Plumbing', contact: 'service@gulfplumbing.com', isPrime: false },
 ];
 
-export const mockCampuses = [
-  { id: 'campus-wallace', name: 'Wallace', fundingSource: 'State Historic Fund A', priority: 'Critical' as Priority },
-  { id: 'campus-woodland', name: 'Woodland/Laplace', fundingSource: 'Parish Tourism Board', priority: 'High' as Priority },
-  { id: 'campus-paris', name: 'Paris', fundingSource: 'General Maintenance Fund', priority: 'Low' as Priority },
-  { id: 'campus-cypress', name: 'Cypress Arts District', fundingSource: 'City Arts Grant', priority: 'High' as Priority },
-  { id: 'campus-jefferson', name: 'Jefferson Parish Schools', fundingSource: 'JP Capital Plan', priority: 'Critical' as Priority },
-  { id: 'campus-hospitality', name: 'Pelican Hospitality Sites', fundingSource: 'Private CapEx', priority: 'Medium' as Priority },
+export const mockProperties = [
+  { id: 'property-wallace', name: 'Wallace', fundingSource: 'State Historic Fund A', priority: 'Critical' as Priority },
+  { id: 'property-woodland', name: 'Woodland/Laplace', fundingSource: 'Parish Tourism Board', priority: 'High' as Priority },
+  { id: 'property-paris', name: 'Paris', fundingSource: 'General Maintenance Fund', priority: 'Low' as Priority },
+  { id: 'property-cypress', name: 'Cypress Arts District', fundingSource: 'City Arts Grant', priority: 'High' as Priority },
+  { id: 'property-jefferson', name: 'Jefferson Parish Schools', fundingSource: 'JP Capital Plan', priority: 'Critical' as Priority },
+  { id: 'property-hospitality', name: 'Pelican Hospitality Sites', fundingSource: 'Private CapEx', priority: 'Medium' as Priority },
 ];
 
 export const mockSites: Site[] = [
-  { id: 'site-1', campusId: 'campus-wallace', name: 'Historic Building A', address: '123 Historic Lane, Wallace, LA', isHistoric: true, historicNotes: 'National Register listed. Requires SHPO approval for all modifications.' },
-  { id: 'site-2', campusId: 'campus-wallace', name: 'Pergola Area', address: '123 Historic Lane, Wallace, LA', isHistoric: false },
-  { id: 'site-3', campusId: 'campus-woodland', name: 'Main Gallery', address: '456 Museum Way, Laplace, LA', isHistoric: true, historicNotes: 'Opening to public Oct 2024. Architect review required.' },
-  { id: 'site-4', campusId: 'campus-paris', name: 'Administrative Building', address: '789 Paris Rd, Paris, LA', isHistoric: false },
-  { id: 'site-5', campusId: 'campus-cypress', name: 'Riverfront Sculpture Garden', address: '200 Cypress Ave, Baton Rouge, LA', isHistoric: false },
-  { id: 'site-6', campusId: 'campus-jefferson', name: 'Jefferson Charter Campus', address: '1500 Jefferson Hwy, Gretna, LA', isHistoric: false },
-  { id: 'site-7', campusId: 'campus-hospitality', name: 'Pelican Grand Ballroom', address: '88 Royal St, New Orleans, LA', isHistoric: false },
+  { id: 'site-1', propertyId: 'property-wallace', name: 'Historic Building A', address: '123 Historic Lane, Wallace, LA', isHistoric: true, historicNotes: 'National Register listed. Requires SHPO approval for all modifications.' },
+  { id: 'site-2', propertyId: 'property-wallace', name: 'Pergola Area', address: '123 Historic Lane, Wallace, LA', isHistoric: false },
+  { id: 'site-3', propertyId: 'property-woodland', name: 'Main Gallery', address: '456 Museum Way, Laplace, LA', isHistoric: true, historicNotes: 'Opening to public Oct 2024. Architect review required.' },
+  { id: 'site-4', propertyId: 'property-paris', name: 'Administrative Building', address: '789 Paris Rd, Paris, LA', isHistoric: false },
+  { id: 'site-5', propertyId: 'property-cypress', name: 'Riverfront Sculpture Garden', address: '200 Cypress Ave, Baton Rouge, LA', isHistoric: false },
+  { id: 'site-6', propertyId: 'property-jefferson', name: 'Jefferson Charter Property', address: '1500 Jefferson Hwy, Gretna, LA', isHistoric: false },
+  { id: 'site-7', propertyId: 'property-hospitality', name: 'Pelican Grand Ballroom', address: '88 Royal St, New Orleans, LA', isHistoric: false },
 ];
 
 export const mockProjects: Project[] = [
@@ -717,7 +719,7 @@ export const mockProjects: Project[] = [
     id: 'proj-1',
     name: 'Wallace Historic Restoration',
     siteId: 'site-1',
-    campusId: 'campus-wallace',
+    propertyId: 'property-wallace',
     clientName: 'Louisiana State Parks',
     clientPhone: '(225) 555-0100',
     clientEmail: 'parks@la.gov',
@@ -738,7 +740,7 @@ export const mockProjects: Project[] = [
     id: 'proj-2',
     name: 'Woodland Gallery Prep',
     siteId: 'site-3',
-    campusId: 'campus-woodland',
+    propertyId: 'property-woodland',
     clientName: 'Woodland Heritage Foundation',
     clientPhone: '(504) 555-0200',
     clientEmail: 'info@woodlandheritage.org',
@@ -757,16 +759,16 @@ export const mockProjects: Project[] = [
   },
   {
     id: 'proj-3',
-    name: 'Paris Campus Maintenance',
+    name: 'Paris Property Maintenance',
     siteId: 'site-4',
-    campusId: 'campus-paris',
+    propertyId: 'property-paris',
     clientName: 'Parish Administration',
     clientPhone: '(318) 555-0300',
     clientEmail: 'maintenance@parish.gov',
     internalOwnerId: 'user-4',
     primeVendorId: 'vendor-1',
     status: 'Planning',
-    clientSummary: 'Campus-wide preventative maintenance and HVAC upgrades.',
+    clientSummary: 'Property-wide preventative maintenance and HVAC upgrades.',
     internalNotes: 'Still scoping annual retainer terms.',
     clientVisibility: { showBudget: false, showTimeline: true, showInvoices: false, showContacts: true },
     shareToken: 'share-proj-3',
@@ -779,7 +781,7 @@ export const mockProjects: Project[] = [
     id: 'proj-4',
     name: 'Cypress Riverfront Sculpture Garden',
     siteId: 'site-5',
-    campusId: 'campus-cypress',
+    propertyId: 'property-cypress',
     clientName: 'Cypress Arts Council',
     clientPhone: '(225) 555-0400',
     clientEmail: 'director@cypressarts.org',
@@ -799,7 +801,7 @@ export const mockProjects: Project[] = [
     id: 'proj-5',
     name: 'Riverwalk Event Pavilion (Client Portal)',
     siteId: 'site-5',
-    campusId: 'campus-cypress',
+    propertyId: 'property-cypress',
     clientName: 'Cypress Arts Council',
     clientPhone: '(225) 555-0400',
     clientEmail: 'director@cypressarts.org',
@@ -819,14 +821,14 @@ export const mockProjects: Project[] = [
     id: 'proj-6',
     name: 'Jefferson Charter Retrofit',
     siteId: 'site-6',
-    campusId: 'campus-jefferson',
+    propertyId: 'property-jefferson',
     clientName: 'Jefferson Parish Schools',
     clientPhone: '(504) 555-0600',
     clientEmail: 'facilities@jpschools.gov',
     internalOwnerId: 'user-2',
     primeVendorId: 'vendor-1',
     status: 'Active',
-    clientSummary: 'MEP upgrades and classroom modernization for charter campus.',
+    clientSummary: 'MEP upgrades and classroom modernization for charter property.',
     internalNotes: 'Phase 1 funded. Phase 2 pending council vote.',
     clientVisibility: { showBudget: true, showTimeline: true, showInvoices: true, showContacts: true },
     shareToken: 'share-proj-6',
@@ -839,7 +841,7 @@ export const mockProjects: Project[] = [
     id: 'proj-7',
     name: 'Jefferson Eastbank HVAC Modernization',
     siteId: 'site-6',
-    campusId: 'campus-jefferson',
+    propertyId: 'property-jefferson',
     clientName: 'Jefferson Parish Schools',
     clientPhone: '(504) 555-0600',
     clientEmail: 'facilities@jpschools.gov',
@@ -859,7 +861,7 @@ export const mockProjects: Project[] = [
     id: 'proj-8',
     name: 'Pelican Hospitality Ballroom Refresh',
     siteId: 'site-7',
-    campusId: 'campus-hospitality',
+    propertyId: 'property-hospitality',
     clientName: 'Pelican Hospitality Group',
     clientPhone: '(504) 555-0800',
     clientEmail: 'projects@pelicanhospitality.com',
@@ -879,7 +881,7 @@ export const mockProjects: Project[] = [
     id: 'proj-9',
     name: 'Pelican Rooftop Lounge Expansion',
     siteId: 'site-7',
-    campusId: 'campus-hospitality',
+    propertyId: 'property-hospitality',
     clientName: 'Pelican Hospitality Group',
     clientPhone: '(504) 555-0800',
     clientEmail: 'projects@pelicanhospitality.com',
@@ -906,7 +908,7 @@ export const mockContacts: Contact[] = [
     type: 'Client',
     email: 'amelia.brooks@la.gov',
     phone: '(225) 555-0140',
-    campusId: 'campus-wallace',
+    propertyId: 'property-wallace',
     projectIds: ['proj-1'],
     leadIds: ['lead-1'],
     preferredChannel: 'Email',
@@ -939,7 +941,7 @@ export const mockContacts: Contact[] = [
     type: 'Client',
     email: 'helena@woodlandheritage.org',
     phone: '(504) 555-0260',
-    campusId: 'campus-woodland',
+    propertyId: 'property-woodland',
     projectIds: ['proj-2'],
     leadIds: ['lead-2'],
     preferredChannel: 'Email',
@@ -956,7 +958,7 @@ export const mockContacts: Contact[] = [
     type: 'Client',
     email: 'andre.martin@parish.gov',
     phone: '(318) 555-0345',
-    campusId: 'campus-paris',
+    propertyId: 'property-paris',
     projectIds: ['proj-3'],
     leadIds: [],
     preferredChannel: 'Email',
@@ -973,7 +975,7 @@ export const mockContacts: Contact[] = [
     type: 'Client',
     email: 'renee@cypressarts.org',
     phone: '(225) 555-0444',
-    campusId: 'campus-cypress',
+    propertyId: 'property-cypress',
     projectIds: ['proj-4', 'proj-5'],
     leadIds: ['lead-4'],
     preferredChannel: 'Email',
@@ -990,7 +992,7 @@ export const mockContacts: Contact[] = [
     type: 'Client',
     email: 'ethan.broussard@jpschools.gov',
     phone: '(504) 555-0640',
-    campusId: 'campus-jefferson',
+    propertyId: 'property-jefferson',
     projectIds: ['proj-6', 'proj-7'],
     leadIds: ['lead-5'],
     preferredChannel: 'Phone',
@@ -1007,7 +1009,7 @@ export const mockContacts: Contact[] = [
     type: 'Client',
     email: 'marisa@pelicanhospitality.com',
     phone: '(504) 555-0820',
-    campusId: 'campus-hospitality',
+    propertyId: 'property-hospitality',
     projectIds: ['proj-8', 'proj-9'],
     leadIds: ['lead-6'],
     preferredChannel: 'Email',
@@ -1030,7 +1032,7 @@ export const mockLeads: Lead[] = [
     estimatedValue: 185000,
     nextStep: 'Submit revised SHPO compliance schedule',
     notes: 'Need cost split between restoration and tourism grant.',
-    campusId: 'campus-wallace',
+    propertyId: 'property-wallace',
     projectId: 'proj-1',
     contactIds: ['contact-1'],
     createdAt: '2024-03-20T10:00:00Z',
@@ -1047,7 +1049,7 @@ export const mockLeads: Lead[] = [
     estimatedValue: 80000,
     nextStep: 'Prepare closeout packet',
     notes: 'Board approved final change order.',
-    campusId: 'campus-woodland',
+    propertyId: 'property-woodland',
     projectId: 'proj-2',
     contactIds: ['contact-3', 'contact-2'],
     createdAt: '2024-01-05T08:00:00Z',
@@ -1064,7 +1066,7 @@ export const mockLeads: Lead[] = [
     estimatedValue: 120000,
     nextStep: 'Deliver preventative maintenance scope draft',
     notes: 'Looking for multi-year retainer.',
-    campusId: 'campus-paris',
+    propertyId: 'property-paris',
     contactIds: ['contact-4'],
     createdAt: '2024-08-20T09:00:00Z',
     updatedAt: '2024-10-18T07:30:00Z',
@@ -1080,7 +1082,7 @@ export const mockLeads: Lead[] = [
     estimatedValue: 95000,
     nextStep: 'Confirm pavilion size + AV requirements',
     notes: 'Auto-created via portal submission for event pavilion.',
-    campusId: 'campus-cypress',
+    propertyId: 'property-cypress',
     projectId: 'proj-5',
     contactIds: ['contact-5'],
     createdAt: '2024-10-25T12:30:00Z',
@@ -1095,9 +1097,9 @@ export const mockLeads: Lead[] = [
     stage: 'Qualified',
     source: 'Client Portal',
     estimatedValue: 150000,
-    nextStep: 'Schedule campus walkthrough with energy team',
+    nextStep: 'Schedule property walkthrough with energy team',
     notes: 'Request for Eastbank HVAC modernization submitted via portal.',
-    campusId: 'campus-jefferson',
+    propertyId: 'property-jefferson',
     projectId: 'proj-7',
     contactIds: ['contact-6'],
     createdAt: '2024-11-01T08:15:00Z',
@@ -1114,7 +1116,7 @@ export const mockLeads: Lead[] = [
     estimatedValue: 130000,
     nextStep: 'Finalize rooftop shading package',
     notes: 'Client portal request converted into Rooftop Lounge expansion project.',
-    campusId: 'campus-hospitality',
+    propertyId: 'property-hospitality',
     projectId: 'proj-9',
     contactIds: ['contact-7'],
     createdAt: '2024-09-18T14:00:00Z',
@@ -1728,7 +1730,7 @@ export const mockInvoices: Invoice[] = [
     id: 'inv-1',
     invoiceNumber: 'INV-2024-001',
     projectId: 'proj-2',
-    campusId: 'campus-woodland',
+    propertyId: 'property-woodland',
     fundingCode: 'PTB-2024-003',
     primeVendorId: 'vendor-1',
     workOrderIds: ['wo-3'],
@@ -1820,7 +1822,7 @@ export const mockContracts: Contract[] = [
     startDate: '2024-11-01',
     status: 'Active',
     createdBy: 'user-4',
-    notes: 'Campus-wide preventative maintenance retainer billed monthly.',
+    notes: 'Property-wide preventative maintenance retainer billed monthly.',
   },
   {
     id: 'contract-3',
@@ -2002,7 +2004,7 @@ export const mockAIContractRecommendations: AIContractRecommendation[] = [
       historicFlag: false,
       permitComplexity: 'High',
       durationDays: 240,
-      campus: 'Jefferson Charter',
+      property: 'Jefferson Charter',
     },
     aiOutputSnapshot: { marginBand: '22-28%', contingency: 0.12 },
     createdAt: '2024-07-05T12:30:00Z',
@@ -2155,6 +2157,10 @@ export function getQuotesByWorkOrderId(workOrderId: string): Quote[] {
   return mockQuotes.filter((q) => q.workOrderId === workOrderId);
 }
 
+export function getQuoteById(id: string): Quote | undefined {
+  return mockQuotes.find((quote) => quote.id === id);
+}
+
 export function getApprovedQuote(workOrderId: string): Quote | undefined {
   return mockQuotes.find((q) => q.workOrderId === workOrderId && q.status === 'Approved');
 }
@@ -2171,8 +2177,8 @@ export function getSiteById(id: string): Site | undefined {
   return mockSites.find((s) => s.id === id);
 }
 
-export function getCampusById(id: string) {
-  return mockCampuses.find((c) => c.id === id);
+export function getPropertyById(id: string) {
+  return mockProperties.find((c) => c.id === id);
 }
 
 export function getWorkOrdersByProjectId(projectId: string): WorkOrder[] {

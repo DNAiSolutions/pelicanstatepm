@@ -1,5 +1,5 @@
 import type { IntakeChannel, LeadNextStep, Priority, WalkthroughPrepBrief } from '../data/pipeline';
-import { aiWalkthroughPlannerService } from './aiWalkthroughPlannerService';
+import { aiService } from './aiService';
 
 export type IntakeDecisionInput = {
   issueSummary: string;
@@ -31,8 +31,8 @@ function computeScore(summary: string, urgency?: Priority) {
 
 function detectNextStep(summary: string, urgency?: Priority): IntakeDecision {
   const score = computeScore(summary, urgency);
-  const projectType = aiWalkthroughPlannerService.detectProjectType(summary);
-  const prepBrief = aiWalkthroughPlannerService.generatePrepBrief(summary);
+  const projectType = aiService.walkthroughPlanner.detectProjectType(summary);
+  const prepBrief = aiService.walkthroughPlanner.generatePrepBrief(summary);
   if (score >= 0.85) {
     return {
       nextStep: 'DispatchCrew',

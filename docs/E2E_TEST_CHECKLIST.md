@@ -5,7 +5,7 @@
 - ✅ Supabase connection verified
 - ✅ Test users configured:
   - owner@pelicanstate.pro (Owner role)
-  - user@pelicanstate.pro (User role, Wallace campus only)
+  - user@pelicanstate.pro (User role, Wallace property only)
 
 ## Test Credentials
 - **Email:** owner@pelicanstate.pro or user@pelicanstate.pro
@@ -24,7 +24,7 @@
 ### Phase 2: Work Request Creation
 - [ ] Click "New Work Request" button
 - [ ] Fill form:
-  - Campus: Select "Wallace"
+  - Property: Select "Wallace"
   - Title: "HVAC Unit Replacement - Room 101"
   - Description: "Replace failing HVAC unit with new unit"
   - Priority: "High"
@@ -62,13 +62,13 @@
 - [ ] Click "New Invoice"
 - [ ] Select work request from dropdown
 - [ ] Verify line items auto-populate from estimate
-- [ ] Select campus for invoice: "Wallace"
+- [ ] Select property for invoice: "Wallace"
 - [ ] Select funding source (e.g., "Operating Budget")
 - [ ] Add note: "Final invoice for HVAC replacement"
 - [ ] Click "Generate Invoice"
 - [ ] Verify invoice displays with all line items
 - [ ] Click "Download PDF"
-- [ ] Verify PDF shows invoice number, date, campus, funding source
+- [ ] Verify PDF shows invoice number, date, property, funding source
 - [ ] Submit invoice
 - [ ] Verify work request status updates to "Invoice"
 
@@ -81,20 +81,20 @@
 - [ ] Verify status changes to "Paid"
 - [ ] Verify payment date is recorded
 
-### Phase 7: Multi-Campus Testing
-- [ ] Login with owner account (has access to all campuses)
-- [ ] Create new work request for "Woodland/Laplace" campus
-- [ ] Create estimate and invoice for this campus
-- [ ] In invoice form, test splitting invoice across multiple campuses
-- [ ] Verify each campus portion calculates correctly
-- [ ] Download PDF and verify campus information is accurate
+### Phase 7: Multi-Property Testing
+- [ ] Login with owner account (has access to all properties)
+- [ ] Create new work request for "Woodland/Laplace" property
+- [ ] Create estimate and invoice for this property
+- [ ] In invoice form, test splitting invoice across multiple properties
+- [ ] Verify each property portion calculates correctly
+- [ ] Download PDF and verify property information is accurate
 
 ### Phase 8: Role-Based Access Control
 - [ ] Logout and login with user@pelicanstate.pro (User role)
-- [ ] Verify can only see "Wallace" campus in dropdowns
-- [ ] Attempt to navigate to other campus work requests (should fail or filter)
-- [ ] Create work request in Wallace campus (should succeed)
-- [ ] Verify cannot create work request for other campuses
+- [ ] Verify can only see "Wallace" property in dropdowns
+- [ ] Attempt to navigate to other property work requests (should fail or filter)
+- [ ] Create work request in Wallace property (should succeed)
+- [ ] Verify cannot create work request for other properties
 
 ### Phase 9: PDF Generation Verification
 - [ ] Download 3 PDFs:
@@ -141,7 +141,7 @@
 | 4 | Estimate Creation | ⬜ | |
 | 5 | Invoice Creation | ⬜ | |
 | 6 | Invoice List & Payment | ⬜ | |
-| 7 | Multi-Campus Testing | ⬜ | |
+| 7 | Multi-Property Testing | ⬜ | |
 | 8 | Role-Based Access | ⬜ | |
 | 9 | PDF Generation | ⬜ | |
 | 10 | Form Validation | ⬜ | |

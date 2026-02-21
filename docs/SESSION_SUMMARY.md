@@ -22,9 +22,9 @@
    - PDF generation testing included
    - Performance on mobile documented
 
-4. **✅ Multi-Campus Invoice Testing** (High Priority)
+4. **✅ Multi-Property Invoice Testing** (High Priority)
    - Created 8 test scenarios for invoice splitting
-   - Automated campus-based splitting logic verified
+   - Automated property-based splitting logic verified
    - Independent payment tracking tested
    - Role-based access tested
 
@@ -110,7 +110,7 @@ Dev Server Status:      ✅ Running (port 5174)
 Supabase Connection:    ✅ Verified
 Test Users:            ✅ Created (owner@, user@)
 Authentication:        ✅ Working
-Multi-campus:          ✅ 3 campuses configured
+Multi-property:          ✅ 3 properties configured
 Responsive Design:     ✅ Tailwind breakpoints working
 PDF Generation:        ✅ All 3 formats working
 Form Validation:       ✅ All validations in place
@@ -158,7 +158,7 @@ Security:              ✅ Checklist included
 - Build & Verification: 15 min
 - E2E Testing: 25 min
 - Mobile Responsive: 20 min
-- Multi-Campus: 15 min
+- Multi-Property: 15 min
 - Skill Verification: 15 min
 - Scripts Verification: 10 min
 - Git & Deployment: 20 min
@@ -202,7 +202,7 @@ OVERALL: Production-ready for immediate deployment
 - [ ] **Run full E2E testing** using E2E_TESTING_GUIDE.md
   - Execute all 12 phases
   - Document any issues found
-  - Verify multi-campus workflow works end-to-end
+  - Verify multi-property workflow works end-to-end
 
 - [ ] **Mobile testing verification** using MOBILE_RESPONSIVENESS_TEST.md
   - Test on actual devices (375px, 768px, 1440px)
@@ -315,7 +315,7 @@ OVERALL: Production-ready for immediate deployment
 - **DNS Provider:** (configure based on choice)
 
 ### Documentation
-- **Testing Guides:** 5 files (E2E, Mobile, Multi-campus, etc.)
+- **Testing Guides:** 5 files (E2E, Mobile, Multi-property, etc.)
 - **Deployment Guide:** DEPLOYMENT_GUIDE.md
 - **Skill Documentation:** .agent/skills/notebooklm-research-agent/
 

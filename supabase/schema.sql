@@ -6,20 +6,31 @@
 -- ============================================================================
 -- CAMPUSES TABLE
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS campuses (
+CREATE TABLE IF NOT EXISTS properties (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL UNIQUE,
   funding_source TEXT NOT NULL,
   address TEXT,
+  is_historic BOOLEAN DEFAULT FALSE,
+  priority TEXT CHECK (priority IN ('Critical','High','Medium','Low')) DEFAULT 'Medium',
+  notes TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Insert default campuses
-INSERT INTO campuses (name, funding_source, address) VALUES
-  ('Wallace', 'State Budget A', 'Wallace, Louisiana'),
-  ('Woodland (Laplace)', 'State Budget B', 'Laplace, Louisiana'),
-  ('Paris', 'State Budget C', 'Paris, Louisiana')
-ON CONFLICT (name) DO NOTHING;
+-- =========================================================================
+-- SITES TABLE
+-- =========================================================================
+CREATE TABLE IF NOT EXISTS sites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  property_id UUID NOT NULL REFERENCES properties(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  address TEXT,
+  is_historic BOOLEAN DEFAULT FALSE,
+  historic_notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_sites_property ON sites(property_id);
 
 -- ============================================================================
 -- USERS TABLE (extends Supabase auth)
@@ -29,10 +40,10 @@ CREATE TABLE IF NOT EXISTS users (
   email TEXT UNIQUE NOT NULL,
   role TEXT NOT NULL DEFAULT 'User' CHECK (role IN ('Owner', 'Developer', 'User')),
   full_name TEXT,
-  campus_assigned UUID[] DEFAULT '{}',
+  property_assigned UUID[] DEFAULT '{}',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-  CONSTRAINT fk_user_campus FOREIGN KEY (campus_assigned) REFERENCES campuses(id) ON DELETE SET NULL
+  CONSTRAINT fk_user_property FOREIGN KEY (property_assigned) REFERENCES properties(id) ON DELETE SET NULL
 );
 
 -- ============================================================================
@@ -41,7 +52,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS work_requests (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   request_number TEXT NOT NULL UNIQUE,
-  campus_id UUID NOT NULL REFERENCES campuses(id) ON DELETE RESTRICT,
+  title TEXT,
+  property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
   property TEXT NOT NULL,
   is_historic BOOLEAN DEFAULT FALSE,
   category TEXT NOT NULL CHECK (
@@ -57,19 +69,25 @@ CREATE TABLE IF NOT EXISTS work_requests (
     )
   ),
   description TEXT NOT NULL,
+  scope_of_work TEXT,
+  inspection_notes TEXT,
+  priority TEXT CHECK (priority IN ('Critical','High','Medium','Low')) DEFAULT 'Medium',
   status TEXT NOT NULL DEFAULT 'Intake' CHECK (
     status IN ('Intake', 'Scoping', 'Estimate', 'Approval', 'Schedule', 'Progress', 'Complete', 'Invoice', 'Paid')
   ),
   created_by UUID NOT NULL REFERENCES auth.users(id) ON DELETE SET NULL,
+  client_contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  submitted_via TEXT CHECK (submitted_via IN ('Internal','ClientPortal','WebForm')) DEFAULT 'Internal',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   completed_at TIMESTAMP WITH TIME ZONE,
   estimated_cost DECIMAL(12, 2),
   approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
-  approved_at TIMESTAMP WITH TIME ZONE
+  approved_at TIMESTAMP WITH TIME ZONE,
+  intake_payload JSONB
 );
 
-CREATE INDEX IF NOT EXISTS idx_work_requests_campus ON work_requests(campus_id);
+CREATE INDEX IF NOT EXISTS idx_work_requests_property ON work_requests(property_id);
 CREATE INDEX IF NOT EXISTS idx_work_requests_status ON work_requests(status);
 CREATE INDEX IF NOT EXISTS idx_work_requests_created_by ON work_requests(created_by);
 
@@ -83,6 +101,11 @@ CREATE TABLE IF NOT EXISTS estimates (
   total_amount DECIMAL(12, 2) NOT NULL,
   not_to_exceed DECIMAL(12, 2),
   status TEXT NOT NULL DEFAULT 'Draft' CHECK (status IN ('Draft', 'Submitted', 'Approved', 'Changes Requested')),
+  client_contact_id UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  client_snapshot JSONB,
+  client_message TEXT,
+  contract_text TEXT,
+  payment_settings JSONB,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   submitted_at TIMESTAMP WITH TIME ZONE,
   approved_by UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -94,13 +117,47 @@ CREATE INDEX IF NOT EXISTS idx_estimates_work_request ON estimates(work_request_
 CREATE INDEX IF NOT EXISTS idx_estimates_status ON estimates(status);
 
 -- ============================================================================
+-- USER PROFILES TABLE (Onboarding + Access Control)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS user_profiles (
+  user_id UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
+  full_name TEXT,
+  role_title TEXT,
+  department TEXT,
+  team_size TEXT,
+  requested_access TEXT NOT NULL CHECK (requested_access IN ('vendor','staff')),
+  access_granted TEXT NOT NULL CHECK (access_granted IN ('vendor','staff')) DEFAULT 'vendor',
+  status TEXT NOT NULL CHECK (status IN ('pending','approved','denied')) DEFAULT 'pending',
+  notes TEXT,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_user_profiles_status ON user_profiles(status);
+
+ALTER TABLE user_profiles ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Users can view their profile" ON user_profiles
+  FOR SELECT USING (user_id = auth.uid());
+
+CREATE POLICY "Users can insert their profile" ON user_profiles
+  FOR INSERT WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Users can update their profile" ON user_profiles
+  FOR UPDATE USING (user_id = auth.uid()) WITH CHECK (user_id = auth.uid());
+
+CREATE POLICY "Admins manage all profiles" ON user_profiles
+  FOR ALL USING (lower(coalesce(auth.jwt()->>'email','')) = ANY('{support@dnai.solutions}'))
+  WITH CHECK (lower(coalesce(auth.jwt()->>'email','')) = ANY('{support@dnai.solutions}'));
+
+-- ============================================================================
 -- INVOICES TABLE
 -- ============================================================================
 CREATE TABLE IF NOT EXISTS invoices (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   invoice_number TEXT NOT NULL UNIQUE,
   work_request_ids UUID[] NOT NULL DEFAULT '{}',
-  campus_id UUID NOT NULL REFERENCES campuses(id) ON DELETE RESTRICT,
+  property_id UUID NOT NULL REFERENCES properties(id) ON DELETE RESTRICT,
   funding_source TEXT NOT NULL,
   line_items JSONB NOT NULL DEFAULT '[]',
   total_amount DECIMAL(12, 2) NOT NULL,
@@ -114,7 +171,7 @@ CREATE TABLE IF NOT EXISTS invoices (
   notes TEXT
 );
 
-CREATE INDEX IF NOT EXISTS idx_invoices_campus ON invoices(campus_id);
+CREATE INDEX IF NOT EXISTS idx_invoices_property ON invoices(property_id);
 CREATE INDEX IF NOT EXISTS idx_invoices_status ON invoices(status);
 CREATE INDEX IF NOT EXISTS idx_invoices_submitted_at ON invoices(submitted_at);
 
@@ -174,7 +231,8 @@ CREATE INDEX IF NOT EXISTS idx_weekly_updates_week ON weekly_updates(week_of);
 -- ============================================================================
 
 -- Enable RLS on all tables
-ALTER TABLE campuses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE properties ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sites ENABLE ROW LEVEL SECURITY;
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE work_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE estimates ENABLE ROW LEVEL SECURITY;
@@ -186,11 +244,31 @@ ALTER TABLE weekly_updates ENABLE ROW LEVEL SECURITY;
 -- ============================================================================
 -- CAMPUSES - Anyone can read
 -- ============================================================================
-CREATE POLICY "Campuses are viewable by everyone" ON campuses
+CREATE POLICY "Properties are viewable by everyone" ON properties
   FOR SELECT USING (true);
 
+CREATE POLICY "Authenticated users can create properties" ON properties
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can update properties" ON properties
+  FOR UPDATE USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
 -- ============================================================================
--- USERS - Users can view their own profile and all users in their campuses
+-- SITES - Child locations under properties
+-- ============================================================================
+CREATE POLICY "Sites are viewable by everyone" ON sites
+  FOR SELECT USING (true);
+
+CREATE POLICY "Authenticated users can create sites" ON sites
+  FOR INSERT WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Authenticated users can update sites" ON sites
+  FOR UPDATE USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+-- ============================================================================
+-- USERS - Users can view their own profile and all users in their properties
 -- ============================================================================
 CREATE POLICY "Users can view themselves" ON users
   FOR SELECT USING (auth.uid() = id);
@@ -210,14 +288,14 @@ CREATE POLICY "Owner and Developer see all work requests" ON work_requests
     )
   );
 
-CREATE POLICY "Users see work requests for their campus" ON work_requests
+CREATE POLICY "Users see work requests for their property" ON work_requests
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
       WHERE id = auth.uid()
       AND (
         role IN ('Owner', 'Developer')
-        OR campus_id = ANY(campus_assigned)
+        OR property_id = ANY(property_assigned)
       )
     )
   );
@@ -246,7 +324,7 @@ CREATE POLICY "Owner and Developer see all estimates" ON estimates
     )
   );
 
-CREATE POLICY "Users see estimates for their campus work requests" ON estimates
+CREATE POLICY "Users see estimates for their property work requests" ON estimates
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM work_requests wr
@@ -254,7 +332,7 @@ CREATE POLICY "Users see estimates for their campus work requests" ON estimates
       WHERE wr.id = estimates.work_request_id
       AND (
         u.role IN ('Owner', 'Developer')
-        OR wr.campus_id = ANY(u.campus_assigned)
+        OR wr.property_id = ANY(u.property_assigned)
       )
     )
   );
@@ -280,14 +358,14 @@ CREATE POLICY "Owner and Developer see all invoices" ON invoices
     )
   );
 
-CREATE POLICY "Users see invoices for their campus" ON invoices
+CREATE POLICY "Users see invoices for their property" ON invoices
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM users
       WHERE id = auth.uid()
       AND (
         role IN ('Owner', 'Developer')
-        OR campus_id = ANY(campus_assigned)
+        OR property_id = ANY(property_assigned)
       )
     )
   );
@@ -302,7 +380,7 @@ CREATE POLICY "Only Owner/Developer can update invoices" ON invoices
   );
 
 -- ============================================================================
--- HISTORIC DOCS - Campus-based access
+-- HISTORIC DOCS - Property-based access
 -- ============================================================================
 CREATE POLICY "Owner and Developer see all historic docs" ON historic_docs
   FOR SELECT USING (
@@ -313,7 +391,7 @@ CREATE POLICY "Owner and Developer see all historic docs" ON historic_docs
     )
   );
 
-CREATE POLICY "Users see historic docs for their campus" ON historic_docs
+CREATE POLICY "Users see historic docs for their property" ON historic_docs
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM work_requests wr
@@ -321,13 +399,13 @@ CREATE POLICY "Users see historic docs for their campus" ON historic_docs
       WHERE wr.id = historic_docs.work_request_id
       AND (
         u.role IN ('Owner', 'Developer')
-        OR wr.campus_id = ANY(u.campus_assigned)
+        OR wr.property_id = ANY(u.property_assigned)
       )
     )
   );
 
 -- ============================================================================
--- SCHEDULES - Campus-based access
+-- SCHEDULES - Property-based access
 -- ============================================================================
 CREATE POLICY "Owner and Developer see all schedules" ON schedules
   FOR SELECT USING (
@@ -338,7 +416,7 @@ CREATE POLICY "Owner and Developer see all schedules" ON schedules
     )
   );
 
-CREATE POLICY "Users see schedules for their campus" ON schedules
+CREATE POLICY "Users see schedules for their property" ON schedules
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM work_requests wr
@@ -346,13 +424,13 @@ CREATE POLICY "Users see schedules for their campus" ON schedules
       WHERE wr.id = schedules.work_request_id
       AND (
         u.role IN ('Owner', 'Developer')
-        OR wr.campus_id = ANY(u.campus_assigned)
+        OR wr.property_id = ANY(u.property_assigned)
       )
     )
   );
 
 -- ============================================================================
--- WEEKLY UPDATES - Campus-based access
+-- WEEKLY UPDATES - Property-based access
 -- ============================================================================
 CREATE POLICY "Owner and Developer see all updates" ON weekly_updates
   FOR SELECT USING (
@@ -363,7 +441,7 @@ CREATE POLICY "Owner and Developer see all updates" ON weekly_updates
     )
   );
 
-CREATE POLICY "Users see updates for their campus" ON weekly_updates
+CREATE POLICY "Users see updates for their property" ON weekly_updates
   FOR SELECT USING (
     EXISTS (
       SELECT 1 FROM work_requests wr
@@ -371,7 +449,7 @@ CREATE POLICY "Users see updates for their campus" ON weekly_updates
       WHERE wr.id = weekly_updates.work_request_id
       AND (
         u.role IN ('Owner', 'Developer')
-        OR wr.campus_id = ANY(u.campus_assigned)
+        OR wr.property_id = ANY(u.property_assigned)
       )
     )
   );

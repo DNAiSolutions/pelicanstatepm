@@ -81,7 +81,7 @@ export const retainerRateService = {
     };
 
     rates?.forEach((rate: RetainerRate) => {
-      matrix[rate.rate_type] = rate;
+      matrix[rate.rate_type as RateType] = rate;
     });
 
     return matrix;

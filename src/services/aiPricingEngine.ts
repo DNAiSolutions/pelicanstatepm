@@ -1,5 +1,5 @@
 import { aiDecisionService } from './aiDecisionService';
-import { type ContractType, type AIPricingSnapshot } from '../data/pipeline';
+import type { ContractType } from '../types';
 
 type LaborClassConfig = {
   baseWage: number;
@@ -84,7 +84,7 @@ export type PricingInput = {
 };
 
 export type PricingResult = {
-  snapshot: AIPricingSnapshot;
+  snapshot: any;
   totalPrice: number;
   directCost: number;
   grossProfit: number;

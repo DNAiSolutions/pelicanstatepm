@@ -18,7 +18,7 @@ export function ProjectTasks({ tasks, onAddTask, onTaskClick }: ProjectTasksProp
         {onAddTask && (
           <button
             onClick={onAddTask}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-[#143352] rounded-lg hover:bg-[#143352]/90 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-[#0f2749] rounded-lg hover:bg-[#0f2749]/90 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add Task

@@ -17,7 +17,7 @@ export function PortalProjectsPage() {
             <h1 className="text-2xl font-heading font-bold text-neutral-900">Projects for {accountName}</h1>
             <p className="text-xs text-neutral-500">{companyName}</p>
             {viewingMessage && <p className="text-xs text-emerald-600 mt-1">{viewingMessage}</p>}
-            <Link to={`/client-portal${contactId ? `?contactId=${contactId}` : ''}`} className="text-xs text-[#143352] underline">← Back to overview</Link>
+            <Link to={`/client-portal${contactId ? `?contactId=${contactId}` : ''}`} className="text-xs text-[#0f2749] underline">← Back to overview</Link>
           </div>
           <button className="border border-neutral-300 text-neutral-700 px-4 py-2 text-sm" onClick={() => navigate('/work-requests/new')}>
             New Work Order
@@ -38,7 +38,7 @@ export function PortalProjectsPage() {
                 <p>Budget {formatCurrency(project.spentBudget)} / {formatCurrency(project.totalBudget)}</p>
                 <p>Schedule {project.startDate} – {project.endDate}</p>
               </div>
-              <Link to={projectLink} className="text-[#143352] text-sm">
+              <Link to={projectLink} className="text-[#0f2749] text-sm">
                 View project
               </Link>
             </div>

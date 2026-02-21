@@ -1,5 +1,5 @@
 import { type Project } from '../../data/pipeline';
-import { getCampusById } from '../../data/pipeline';
+import { getPropertyById } from '../../data/pipeline';
 
 interface DashboardFeaturedProjectProps {
   project: Project;
@@ -22,7 +22,7 @@ export function DashboardFeaturedProject({
   metrics,
   onViewProjectClick,
 }: DashboardFeaturedProjectProps) {
-  const campus = project.campusId ? getCampusById(project.campusId) : null;
+  const property = project.propertyId ? getPropertyById(project.propertyId) : null;
 
   return (
     <div className="bg-white border border-neutral-200 p-6 rounded-lg lg:col-span-2">
@@ -32,12 +32,12 @@ export function DashboardFeaturedProject({
             {project.name}
           </h2>
           <p className="text-sm text-neutral-500">
-            {campus?.name} • {project.clientName}
+            {property?.name} • {project.clientName}
           </p>
         </div>
         <button
           onClick={onViewProjectClick}
-          className="text-sm text-[#143352] hover:text-[#143352]/80 font-medium"
+          className="text-sm text-[#0f2749] hover:text-[#0f2749]/80 font-medium"
         >
           View Project →
         </button>
@@ -51,7 +51,7 @@ export function DashboardFeaturedProject({
         </div>
         <div className="w-full bg-neutral-200 rounded-full h-2 overflow-hidden">
           <div
-            className="bg-[#143352] h-full transition-all"
+            className="bg-[#0f2749] h-full transition-all"
             style={{ width: `${metrics.timelinePercent}%` }}
           />
         </div>

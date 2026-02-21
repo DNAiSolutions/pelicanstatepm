@@ -2,9 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { workRequestService } from '../services/workRequestService';
 import { invoiceService } from '../services/invoiceService';
-import { campusService, type Campus } from '../services/campusService';
+import { propertyService, type Property } from '../services/propertyService';
 import { pdfService } from '../services/pdfService';
-import type { WorkRequest, InvoiceLineItem } from '../types';
+import type { WorkRequest } from '../types';
+import type { InvoiceLineItem } from '../types';
 import { AlertCircle, DollarSign, FileText, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { InvoiceDetailForm } from '../components/InvoiceDetailForm';
@@ -13,7 +14,7 @@ export function InvoiceBuilderPage() {
   const navigate = useNavigate();
 
   const [workRequests, setWorkRequests] = useState<WorkRequest[]>([]);
-  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [selectedRequests, setSelectedRequests] = useState<string[]>([]);
   const [lineItems, setLineItems] = useState<InvoiceLineItem[]>([]);
   const [notes, setNotes] = useState('');
@@ -28,10 +29,10 @@ export function InvoiceBuilderPage() {
         setIsLoading(true);
         const [wr, c] = await Promise.all([
           workRequestService.getWorkRequests({ status: 'Complete' }),
-          campusService.getCampuses(),
+          propertyService.getProperties(),
         ]);
         setWorkRequests(wr);
-        setCampuses(c);
+        setProperties(c);
       } catch (error) {
         console.error('Failed to load data:', error);
         toast.error('Failed to load data');
@@ -45,36 +46,36 @@ export function InvoiceBuilderPage() {
 
   const totalAmount = invoiceService.calculateTotal(lineItems);
   const selectedWorkRequests = workRequests.filter((wr) => selectedRequests.includes(wr.id));
-  const campusesForInvoice = [...new Set(selectedWorkRequests.map((wr) => wr.campus_id))];
+  const propertiesForInvoice = [...new Set(selectedWorkRequests.map((wr) => wr.property_id))];
   const workRequestLookup = new Map(workRequests.map((wr) => [wr.id, wr]));
 
   // Toggle work request selection
-  const toggleWorkRequest = (requestId: string) => {
-    setSelectedRequests((prev) => {
-      const next = prev.includes(requestId)
-        ? prev.filter((id) => id !== requestId)
-        : [...prev, requestId];
+    const toggleWorkRequest = (requestId: string) => {
+      setSelectedRequests((prev) => {
+        const next = prev.includes(requestId)
+          ? prev.filter((id) => id !== requestId)
+          : [...prev, requestId];
 
-      setLineItems((items) => items.filter((item) => !item.work_request_id || next.includes(item.work_request_id)));
+      setLineItems((items) => items.filter((item) => !item.work_order_id || next.includes(item.work_order_id)));
       return next;
     });
   };
 
   // Add line item
-  const addLineItemForCampus = (campusId: string) => {
-    const campusRequests = selectedWorkRequests.filter((wr) => wr.campus_id === campusId);
-    if (campusRequests.length === 0) {
-      toast.error('Select a work request for this campus first');
+  const addLineItemForProperty = (propertyId: string) => {
+    const propertyRequests = selectedWorkRequests.filter((wr) => wr.property_id === propertyId);
+    if (propertyRequests.length === 0) {
+      toast.error('Select a work request for this property first');
       return;
     }
 
-    const defaultRequest = campusRequests[0];
+    const defaultRequest = propertyRequests[0];
     setLineItems((current) => [
       ...current,
       {
         description: '',
         location: defaultRequest.property || '',
-        work_request_id: defaultRequest.id,
+        work_order_id: defaultRequest.id,
         quantity: 1,
         unit: 'hrs',
         rate: 0,
@@ -90,7 +91,7 @@ export function InvoiceBuilderPage() {
       const updated = [...current];
       const nextItem = { ...updated[index], [field]: value } as InvoiceLineItem;
 
-      if (field === 'work_request_id' && typeof value === 'string') {
+      if (field === 'work_order_id' && typeof value === 'string') {
         const wr = workRequestLookup.get(value);
         nextItem.location = wr?.property || '';
       }
@@ -111,14 +112,14 @@ export function InvoiceBuilderPage() {
     setLineItems(lineItems.filter((_, i) => i !== index));
   };
 
-  // Get campus name
-  const getCampusName = (campusId: string) => {
-    return campuses.find((c) => c.id === campusId)?.name || 'Unknown';
+  // Get property name
+  const getPropertyName = (propertyId: string) => {
+    return properties.find((c) => c.id === propertyId)?.name || 'Unknown';
   };
 
   // Get funding source
-  const getFundingSource = (campusId: string) => {
-    return campuses.find((c) => c.id === campusId)?.funding_source || 'Unknown';
+  const getFundingSource = (propertyId: string) => {
+    return properties.find((c) => c.id === propertyId)?.funding_source || 'Unknown';
   };
 
   // Validate form
@@ -134,25 +135,25 @@ export function InvoiceBuilderPage() {
     }
 
     const validation = invoiceService.validateInvoice({
-      work_request_ids: selectedRequests,
-      campus_id: campusesForInvoice[0] || '',
-      funding_source: getFundingSource(campusesForInvoice[0]) || '',
+      work_order_ids: selectedRequests,
+      property_id: propertiesForInvoice[0] || '',
+      funding_code: getFundingSource(propertiesForInvoice[0]) || '',
       line_items: lineItems,
       total_amount: totalAmount,
       status: 'Draft',
     });
 
     if (!validation.valid) {
-      newErrors.invoice = validation.errors.join('; ');
+      newErrors.invoice = Object.values(validation.errors).join('; ');
     }
 
-    campusesForInvoice.forEach((campusId) => {
-      const campusHasItems = lineItems.some((item) => {
-        const wr = workRequestLookup.get(item.work_request_id);
-        return wr?.campus_id === campusId;
+      propertiesForInvoice.forEach((propertyId) => {
+      const propertyHasItems = lineItems.some((item) => {
+        const wr = workRequestLookup.get(item.work_order_id);
+        return wr?.property_id === propertyId;
       });
-      if (!campusHasItems) {
-        newErrors.lineItems = `Add at least one line item for ${getCampusName(campusId)}`;
+      if (!propertyHasItems) {
+        newErrors.lineItems = `Add at least one line item for ${getPropertyName(propertyId)}`;
       }
     });
 
@@ -163,28 +164,37 @@ export function InvoiceBuilderPage() {
   // Download PDF preview
   const handleDownloadPDF = async () => {
     try {
-      if (campusesForInvoice.length === 0 || lineItems.length === 0) {
+      if (propertiesForInvoice.length === 0 || lineItems.length === 0) {
         toast.error('Select work requests and add line items first');
         return;
       }
 
-      const campusId = campusesForInvoice[0];
-      const campusName = getCampusName(campusId);
-      const campusLineItems = lineItems.filter((item) => {
-        const wr = workRequestLookup.get(item.work_request_id);
-        return wr?.campus_id === campusId;
+      const propertyId = propertiesForInvoice[0];
+      const propertyName = getPropertyName(propertyId);
+      const propertyLineItems = lineItems.filter((item) => {
+        const wr = workRequestLookup.get(item.work_order_id);
+        return wr?.property_id === propertyId;
       });
-      const campusTotal = invoiceService.calculateTotal(campusLineItems);
+      const pdfLineItems = propertyLineItems.map((item) => ({
+        work_request_id: item.work_order_id,
+        description: item.description,
+        location: item.location,
+        quantity: item.quantity,
+        rate: item.rate,
+        amount: item.amount,
+        work_performed_notes: item.work_performed_notes,
+      }));
+      const propertyTotal = invoiceService.calculateTotal(propertyLineItems);
 
       await pdfService.generateInvoicePDF(
         {
           invoice_number: `INV-${new Date().getFullYear()}-PREVIEW`,
-          campus_name: campusName,
-          funding_source: getFundingSource(campusId),
-          line_items: campusLineItems,
-          total_amount: campusTotal,
+          property_name: propertyName,
+          funding_source: getFundingSource(propertyId),
+          line_items: pdfLineItems,
+          total_amount: propertyTotal,
         },
-        `Invoice-Preview-${campusName}.pdf`
+        `Invoice-Preview-${propertyName}.pdf`
       );
       toast.success('Invoice preview downloaded');
     } catch (error) {
@@ -205,36 +215,36 @@ export function InvoiceBuilderPage() {
     try {
       setIsSubmitting(true);
 
-      // Group line items by campus
-      const invoicesByCampus = new Map<string, any>();
+      // Group line items by property
+      const invoicesByProperty = new Map<string, any>();
 
-      for (const campusId of campusesForInvoice) {
-        const campusLineItems = lineItems.filter((item) => {
-          const wr = workRequests.find((w) => w.id === item.work_request_id);
-          return wr?.campus_id === campusId;
-        });
+      for (const propertyId of propertiesForInvoice) {
+          const propertyLineItems = lineItems.filter((item) => {
+            const wr = workRequests.find((w) => w.id === item.work_order_id);
+            return wr?.property_id === propertyId;
+          });
 
-        if (campusLineItems.length > 0) {
-          const campusTotal = invoiceService.calculateTotal(campusLineItems);
+        if (propertyLineItems.length > 0) {
+          const propertyTotal = invoiceService.calculateTotal(propertyLineItems);
 
-          invoicesByCampus.set(campusId, {
-            work_request_ids: selectedRequests.filter((id) => {
+          invoicesByProperty.set(propertyId, {
+            work_order_ids: selectedRequests.filter((id) => {
               const wr = workRequests.find((w) => w.id === id);
-              return wr?.campus_id === campusId;
+              return wr?.property_id === propertyId;
             }),
-            campus_id: campusId,
-            funding_source: getFundingSource(campusId),
-            line_items: campusLineItems,
-            total_amount: campusTotal,
+            property_id: propertyId,
+            funding_code: getFundingSource(propertyId),
+            line_items: propertyLineItems,
+            total_amount: propertyTotal,
             status: 'Submitted',
             notes,
-            submitted_at: new Date().toISOString() as any,
+            submitted_at: new Date().toISOString(),
           });
         }
       }
 
       // Create invoices
-      const createdInvoices = await invoiceService.createSplitInvoices(invoicesByCampus);
+      const createdInvoices = await invoiceService.createSplitInvoices(Array.from(invoicesByProperty.values()));
 
       toast.success(`${createdInvoices.length} invoice(s) created and submitted!`);
       navigate('/invoices');
@@ -265,7 +275,7 @@ export function InvoiceBuilderPage() {
           Create Invoice
         </h1>
         <p className="text-neutral-600">
-          Select completed work and create invoices by campus and funding source
+          Select completed work and create invoices by property and funding source
         </p>
       </div>
 
@@ -303,7 +313,7 @@ export function InvoiceBuilderPage() {
                   <div className="flex-1 min-w-0">
                     <p className="font-medium text-neutral-900">{wr.request_number}</p>
                     <p className="text-sm text-neutral-600">
-                      {wr.property} • {getCampusName(wr.campus_id)} • ${wr.estimated_cost?.toFixed(2) || 'TBD'}
+                      {wr.property} • {getPropertyName(wr.property_id)} • ${wr.estimated_cost?.toFixed(2) || 'TBD'}
                     </p>
                   </div>
                 </label>
@@ -312,22 +322,22 @@ export function InvoiceBuilderPage() {
           )}
         </div>
 
-        {/* Campus & Funding Summary */}
-        {campusesForInvoice.length > 0 && (
+        {/* Property & Funding Summary */}
+        {propertiesForInvoice.length > 0 && (
           <div className="card p-8 bg-blue-50 border-blue-200">
             <h3 className="font-heading font-bold text-neutral-900 mb-3">
-              Invoice Summary by Campus
+              Invoice Summary by Property
             </h3>
             <div className="space-y-2">
-              {campusesForInvoice.map((campusId) => (
-                <div key={campusId} className="flex justify-between items-center">
-                  <span className="font-medium text-neutral-900">{getCampusName(campusId)}</span>
-                  <span className="text-sm text-neutral-600">{getFundingSource(campusId)}</span>
+              {propertiesForInvoice.map((propertyId) => (
+                <div key={propertyId} className="flex justify-between items-center">
+                  <span className="font-medium text-neutral-900">{getPropertyName(propertyId)}</span>
+                  <span className="text-sm text-neutral-600">{getFundingSource(propertyId)}</span>
                 </div>
               ))}
             </div>
             <p className="text-xs text-neutral-600 mt-4">
-              📌 A separate invoice will be created for each campus with its own funding source
+              📌 A separate invoice will be created for each property with its own funding source
             </p>
           </div>
         )}
@@ -339,7 +349,7 @@ export function InvoiceBuilderPage() {
               <h2 className="text-2xl font-heading font-bold text-neutral-900">
                 Step 2: Detailed Line Items
               </h2>
-              <p className="text-sm text-neutral-600">Every line item must document what work happened, where, and for which campus.</p>
+              <p className="text-sm text-neutral-600">Every line item must document what work happened, where, and for which property.</p>
             </div>
           </div>
 
@@ -349,10 +359,10 @@ export function InvoiceBuilderPage() {
             </div>
           ) : (
             <InvoiceDetailForm
-              campuses={campuses}
+              properties={properties}
               selectedWorkRequests={selectedWorkRequests}
               lineItems={lineItems}
-              onAddItem={addLineItemForCampus}
+              onAddItem={addLineItemForProperty}
               onUpdateItem={updateLineItem}
               onRemoveItem={removeLineItem}
               errors={errors.lineItems || errors.invoice}
@@ -406,7 +416,7 @@ export function InvoiceBuilderPage() {
           <button
             type="button"
             onClick={handleDownloadPDF}
-            disabled={campusesForInvoice.length === 0 || lineItems.length === 0}
+            disabled={propertiesForInvoice.length === 0 || lineItems.length === 0}
             className="btn-secondary py-3 px-6 font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
           >
             <Download className="w-5 h-5" />
@@ -429,10 +439,10 @@ export function InvoiceBuilderPage() {
             How It Works
           </p>
           <ul className="list-disc list-inside space-y-1">
-            <li>Select completed work requests from different campuses</li>
+            <li>Select completed work requests from different properties</li>
             <li>Add line items with details and amounts</li>
-            <li>Invoices are automatically split by campus and funding source</li>
-            <li>Each campus gets its own invoice with the correct funding source</li>
+            <li>Invoices are automatically split by property and funding source</li>
+            <li>Each property gets its own invoice with the correct funding source</li>
             <li>All invoices are submitted and marked "Submitted" status</li>
           </ul>
         </div>

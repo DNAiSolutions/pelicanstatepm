@@ -43,7 +43,7 @@ export const pdfService = {
     doc.text('BILL TO:', 20, yPos);
     yPos += 7;
     doc.setFontSize(10);
-    doc.text(`Campus: ${invoiceData.campus_name || 'Unknown'}`, 20, yPos);
+    doc.text(`Property: ${invoiceData.property_name || 'Unknown'}`, 20, yPos);
     yPos += 5;
     doc.text(`Funding Source: ${invoiceData.funding_source || 'Unknown'}`, 20, yPos);
     yPos += 15;

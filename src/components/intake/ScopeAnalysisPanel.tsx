@@ -38,7 +38,7 @@ export function ScopeAnalysisPanel({ analysis, onAccept, onOverride, selectedTem
           <button
             type="button"
             onClick={() => onAccept(analysis.primaryTemplate)}
-            className="border border-[#143352] px-3 py-1 uppercase tracking-wide text-[#143352]"
+            className="border border-[#0f2749] px-3 py-1 uppercase tracking-wide text-[#0f2749]"
           >
             Accept {primaryTemplate?.name ?? analysis.primaryTemplate}
           </button>

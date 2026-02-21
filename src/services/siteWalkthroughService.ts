@@ -1,55 +1,75 @@
 import { supabase } from './supabaseClient';
 import type { SiteWalkthrough, SiteFinding } from '../types';
 
+function mapWalkthrough(row: any): SiteWalkthrough {
+  return {
+    id: row.id,
+    property_id: row.property_id,
+    scheduled_date: row.scheduled_date,
+    completed_date: row.completed_date ?? undefined,
+    status: row.status,
+    findings: row.findings ?? [],
+    priority_list: row.priority_list ?? [],
+    notes: row.notes ?? undefined,
+  };
+}
+
 export const siteWalkthroughService = {
-  // Get all site walkthroughs
   async getSiteWalkthroughs(filters?: {
-    campus_id?: string;
+    property_id?: string;
+    property_ids?: string[];
     status?: 'Scheduled' | 'In Progress' | 'Complete';
-  }) {
+  }): Promise<SiteWalkthrough[]> {
+    if (filters?.property_ids && filters.property_ids.length === 0) {
+      return [];
+    }
+
     let query = supabase.from('site_walkthroughs').select('*');
 
-    if (filters?.campus_id) {
-      query = query.eq('campus_id', filters.campus_id);
+    if (filters?.property_ids && filters.property_ids.length > 0) {
+      query = query.in('property_id', filters.property_ids);
+    } else if (filters?.property_id) {
+      query = query.eq('property_id', filters.property_id);
     }
+
     if (filters?.status) {
       query = query.eq('status', filters.status);
     }
 
     const { data, error } = await query.order('scheduled_date', { ascending: true });
     if (error) throw error;
-    return data;
+    return (data ?? []).map(mapWalkthrough);
   },
 
   // Get single site walkthrough
-  async getSiteWalkthrough(id: string) {
+  async getSiteWalkthrough(id: string): Promise<SiteWalkthrough> {
     const { data, error } = await supabase
       .from('site_walkthroughs')
       .select('*')
       .eq('id', id)
       .single();
     if (error) throw error;
-    return data;
+    return mapWalkthrough(data);
   },
 
   // Create new site walkthrough
   async createSiteWalkthrough(
-    walkthrough: Omit<SiteWalkthrough, 'id' | 'findings'>
-  ) {
+    walkthrough: Omit<SiteWalkthrough, 'id' | 'findings'> & { findings?: SiteFinding[]; priority_list?: string[] }
+  ): Promise<SiteWalkthrough> {
     const { data, error } = await supabase
       .from('site_walkthroughs')
-      .insert([walkthrough])
+      .insert([{ ...walkthrough, findings: walkthrough.findings ?? [], priority_list: walkthrough.priority_list ?? [] }])
       .select()
       .single();
     if (error) throw error;
-    return data;
+    return mapWalkthrough(data);
   },
 
   // Update site walkthrough
   async updateSiteWalkthrough(
     id: string,
     updates: Partial<SiteWalkthrough>
-  ) {
+  ): Promise<SiteWalkthrough> {
     const { data, error } = await supabase
       .from('site_walkthroughs')
       .update(updates)
@@ -57,7 +77,7 @@ export const siteWalkthroughService = {
       .select()
       .single();
     if (error) throw error;
-    return data;
+    return mapWalkthrough(data);
   },
 
   // Update walkthrough status
@@ -127,35 +147,23 @@ export const siteWalkthroughService = {
   },
 
   // Get critical findings
-  async getCriticalFindings(campusId?: string) {
-    let query = supabase
-      .from('site_walkthroughs')
-      .select('*');
-
-    if (campusId) {
-      query = query.eq('campus_id', campusId);
-    }
-
-    const { data, error } = await query;
-    if (error) throw error;
-
-    // Filter findings by severity
+  async getCriticalFindings(propertyId?: string) {
+    const walkthroughs = await this.getSiteWalkthroughs({ property_id: propertyId });
     const criticalFindings: SiteFinding[] = [];
-    data?.forEach((walkthrough: SiteWalkthrough) => {
-      walkthrough.findings?.forEach((finding: SiteFinding) => {
+    walkthroughs.forEach((walkthrough) => {
+      walkthrough.findings?.forEach((finding) => {
         if (finding.severity === 'Critical') {
           criticalFindings.push(finding);
         }
       });
     });
-
     return criticalFindings;
   },
 
-  // Get walkthrough summary by campus
-  async getWalkthroughSummary(campusId: string) {
-    const walkthroughs = await this.getSiteWalkthroughs({ campus_id: campusId });
-    
+  // Get walkthrough summary by property
+  async getWalkthroughSummary(propertyId: string) {
+    const walkthroughs = await this.getSiteWalkthroughs({ property_id: propertyId });
+
     const summary = {
       totalWalkthroughs: walkthroughs?.length || 0,
       completed: walkthroughs?.filter(w => w.status === 'Complete').length || 0,

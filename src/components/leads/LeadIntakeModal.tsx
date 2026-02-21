@@ -1,18 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  mockCampuses,
-  mockContacts,
-  LEAD_NEXT_STEP_LABELS,
-  type IntakeChannel,
-  type Priority,
-  type Lead,
-  type Contact,
-} from '../../data/pipeline';
+import { LEAD_NEXT_STEP_LABELS, type IntakeChannel, type Priority, type Lead, type Contact } from '../../types';
 import { intakeDecisionService } from '../../services/intakeDecisionService';
 import { leadService, type LeadIntakeFormInput } from '../../services/leadService';
 import { saveWalkthroughDraftFromLead } from '../../services/walkthroughDraftService';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
+import { contactService } from '../../services/contactService';
+import { propertyService, type Property } from '../../services/propertyService';
+import { projectService } from '../../services/projectService';
+import { siteService } from '../../services/siteService';
+import { useAuth } from '../../context/AuthContext';
 
 type LeadIntakeModalProps = {
   open: boolean;
@@ -20,7 +17,7 @@ type LeadIntakeModalProps = {
   mode?: 'internal' | 'client';
   defaultCompany?: string;
   defaultContact?: { name?: string; email?: string; phone?: string };
-  defaultCampusId?: string;
+  defaultPropertyId?: string;
   defaultProjectId?: string;
   onCreated?: (lead: Lead) => void;
   onLeadUpdated?: (lead: Lead) => void;
@@ -31,7 +28,7 @@ type LeadIntakeFormState = {
   contactName: string;
   email: string;
   phone: string;
-  campusId: string;
+  propertyId: string;
   issueSummary: string;
   jobAddress: string;
   urgency: Priority;
@@ -42,10 +39,11 @@ type LeadIntakeFormState = {
   preferredChannel: 'Email' | 'Phone' | 'Text';
   handledBy: string;
   callSource: string;
-  campusMode: 'existing' | 'new';
-  newCampusName: string;
-  newCampusFunding: string;
-  newCampusPriority: Priority;
+  propertyMode: 'existing' | 'new';
+  newPropertyName: string;
+  newPropertyAddress: string;
+  newPropertyFunding: string;
+  newPropertyPriority: Priority;
 };
 
 const channels: { label: string; value: IntakeChannel }[] = [
@@ -64,7 +62,7 @@ export function LeadIntakeModal({
   mode = 'internal',
   defaultCompany,
   defaultContact,
-  defaultCampusId,
+  defaultPropertyId,
   defaultProjectId,
   onCreated,
   onLeadUpdated,
@@ -77,13 +75,16 @@ export function LeadIntakeModal({
   const [attachmentFiles, setAttachmentFiles] = useState<File[]>([]);
   const [walkthroughDate, setWalkthroughDate] = useState('');
   const [walkthroughNotes, setWalkthroughNotes] = useState('');
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
   const navigate = useNavigate();
+  const { user } = useAuth();
   const buildInitialForm = useCallback((): LeadIntakeFormState => ({
     companyName: defaultCompany || '',
     contactName: defaultContact?.name || '',
     email: defaultContact?.email || '',
     phone: defaultContact?.phone || '',
-    campusId: defaultCampusId || mockCampuses[0]?.id || '',
+    propertyId: defaultPropertyId || properties[0]?.id || '',
     issueSummary: '',
     jobAddress: '',
     urgency: 'Medium',
@@ -94,11 +95,12 @@ export function LeadIntakeModal({
     preferredChannel: 'Email',
     handledBy: '',
     callSource: '',
-    campusMode: 'existing',
-    newCampusName: '',
-    newCampusFunding: '',
-    newCampusPriority: 'Medium',
-  }), [defaultCampusId, defaultCompany, defaultContact, mode]);
+    propertyMode: (defaultPropertyId || properties.length > 0) ? 'existing' : 'new',
+    newPropertyName: defaultCompany || '',
+    newPropertyAddress: '',
+    newPropertyFunding: '',
+    newPropertyPriority: 'Medium',
+  }), [defaultPropertyId, defaultCompany, defaultContact, mode, properties]);
   const [form, setForm] = useState<LeadIntakeFormState>(buildInitialForm);
 
   const decisionPreview = useMemo(() => {
@@ -109,24 +111,43 @@ export function LeadIntakeModal({
   const duplicateContact = useMemo(() => {
     const normalizedEmail = form.email.trim().toLowerCase();
     const normalizedPhone = form.phone ? form.phone.replace(/[^0-9]/g, '') : '';
-    return mockContacts.find((contact) => {
+    return contacts.find((contact) => {
       if (contact.id === selectedContactId) return false;
       if (normalizedEmail && contact.email.toLowerCase() === normalizedEmail) return true;
       if (normalizedPhone && contact.phone.replace(/[^0-9]/g, '') === normalizedPhone) return true;
       return false;
     });
-  }, [form.email, form.phone, selectedContactId]);
+  }, [contacts, form.email, form.phone, selectedContactId]);
 
   const selectedContact: Contact | undefined = useMemo(() => {
     if (selectedContactId) {
-      return mockContacts.find((contact) => contact.id === selectedContactId);
+      return contacts.find((contact) => contact.id === selectedContactId);
     }
     return undefined;
-  }, [selectedContactId]);
+  }, [contacts, selectedContactId]);
+
+  useEffect(() => {
+    async function loadReferenceData() {
+      try {
+        const [contactList, propertyList] = await Promise.all([contactService.list(), propertyService.getProperties()]);
+        setContacts(contactList);
+        setProperties(propertyList);
+      } catch (err) {
+        console.warn('Unable to load contacts or properties', err);
+      }
+    }
+    loadReferenceData();
+  }, []);
 
   useEffect(() => {
     if (open) {
-      setForm(buildInitialForm());
+      setForm((prev) => {
+        const next = buildInitialForm();
+        if (!properties.length && !next.propertyId) {
+          next.propertyMode = 'new';
+        }
+        return { ...prev, ...next };
+      });
       setAttachmentsInput('');
       setAttachmentFiles([]);
       setSubmitting(false);
@@ -135,13 +156,13 @@ export function LeadIntakeModal({
       setWalkthroughDate('');
       setWalkthroughNotes('');
       if (defaultContact) {
-        const existing = mockContacts.find((contact) => contact.email === defaultContact.email);
+        const existing = contacts.find((contact) => contact.email === defaultContact.email);
         setSelectedContactId(existing?.id || '');
       } else {
         setSelectedContactId('');
       }
     }
-  }, [open, buildInitialForm, defaultContact]);
+  }, [open, buildInitialForm, defaultContact, contacts]);
 
   const resetState = () => {
     setForm(buildInitialForm());
@@ -160,8 +181,6 @@ export function LeadIntakeModal({
     onClose();
   };
 
-  if (!open) return null;
-
   useEffect(() => {
     if (selectedContact) {
       setForm((prev) => ({
@@ -170,19 +189,46 @@ export function LeadIntakeModal({
         contactName: selectedContact.name,
         email: selectedContact.email,
         phone: selectedContact.phone,
-        campusId: selectedContact.campusId || prev.campusId,
-        preferredChannel: selectedContact.preferredChannel || prev.preferredChannel,
+        propertyId: selectedContact.property_id || prev.propertyId,
+        preferredChannel: selectedContact.preferred_channel || prev.preferredChannel,
       }));
     }
   }, [selectedContact]);
+
+  useEffect(() => {
+    if (!open) return;
+    setForm((prev) => {
+      if (prev.propertyMode === 'existing') {
+        if (!properties.length) {
+          return { ...prev, propertyMode: 'new', propertyId: '' };
+        }
+        if (!prev.propertyId && properties[0]) {
+          return { ...prev, propertyId: properties[0].id };
+        }
+      }
+      return prev;
+    });
+  }, [properties, open]);
+
+  if (!open) return null;
 
   const canProceedStep1 = Boolean(form.companyName && form.contactName && form.email && form.phone);
   const canProceedStep2 = Boolean(form.issueSummary.trim().length > 5);
 
   const handleSubmit = async () => {
     try {
-      if (form.campusMode === 'new' && !form.newCampusName.trim()) {
-        toast.error('Enter a campus name');
+      if (form.propertyMode === 'new') {
+        if (!form.newPropertyName.trim()) {
+          toast.error('Enter a property name');
+          return undefined;
+        }
+        if (!form.newPropertyAddress.trim()) {
+          toast.error('Enter a property address');
+          return undefined;
+        }
+      }
+      if (form.propertyMode === 'existing' && !form.propertyId) {
+        toast.error('Select a property');
         return undefined;
       }
       setSubmitting(true);
@@ -191,23 +237,24 @@ export function LeadIntakeModal({
         .split('\n')
         .map((line) => line.trim())
         .filter(Boolean);
-      let campusId = form.campusId;
-      if (form.campusMode === 'new') {
-        const newCampusId = `campus-${form.newCampusName.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now().toString(36)}`;
-        campusId = newCampusId;
-        mockCampuses.push({
-          id: newCampusId,
-          name: form.newCampusName.trim(),
-          fundingSource: form.newCampusFunding.trim() || 'Client Provided',
-          priority: form.newCampusPriority,
+      let propertyId = form.propertyId;
+      if (form.propertyMode === 'new') {
+        const newProperty = await propertyService.createProperty({
+          name: form.newPropertyName.trim() as Property['name'],
+          address: form.newPropertyAddress.trim(),
+          funding_source: form.newPropertyFunding.trim() || 'Client Provided',
+          is_historic: form.newPropertyPriority === 'Critical',
+          priority: form.newPropertyPriority,
         });
+        propertyId = newProperty.id;
+        setProperties((prev) => [...prev, newProperty]);
       }
       const payload: LeadIntakeFormInput = {
         companyName: form.companyName,
         contactName: form.contactName,
         email: form.email,
         phone: form.phone,
-        campusId,
+        propertyId,
         projectId: defaultProjectId,
         issueSummary: form.issueSummary,
         jobAddress: form.jobAddress,
@@ -224,13 +271,16 @@ export function LeadIntakeModal({
         submissionSource: mode === 'client' ? 'Web' : 'Internal',
       };
       const lead = await leadService.createFromIntake(payload);
+      // Fire-and-forget — a failure here must not abort the intake flow
+      contactService.list().then(setContacts).catch(() => {});
       setSuccessLead(lead);
       onCreated?.(lead);
       onLeadUpdated?.(lead);
       toast.success('Intake captured');
       return lead;
-    } catch (error) {
-      toast.error('Unable to submit intake');
+    } catch (err) {
+      console.error('Submit intake error:', err);
+      toast.error(err instanceof Error ? err.message : 'Unable to submit intake');
       return undefined;
     } finally {
       setSubmitting(false);
@@ -254,9 +304,96 @@ export function LeadIntakeModal({
         navigate(`/walkthroughs/new/${scheduled.id}`);
       }
     } else if (action === 'nurture') {
-      toast.success('Nurture sequence starting');
+      try {
+        const nurtured = await leadService.update(lead.id, {
+          stage: 'Qualified',
+          follow_up_status: 'InProgress',
+          recommended_next_step: 'NurtureSequence',
+          decision_notes: 'Nurture sequence initiated from intake modal',
+        });
+        setSuccessLead(nurtured);
+        onLeadUpdated?.(nurtured);
+        toast.success('Nurture sequence started');
+      } catch (err) {
+        console.error(err);
+        toast.error('Unable to start nurture sequence');
+      }
     } else if (action === 'convert') {
-      navigate('/leads');
+      await convertLeadToProject(lead);
+    } else {
+      setSuccessLead(lead);
+    }
+  };
+
+  const convertLeadToProject = async (lead: Lead) => {
+    if (!user) {
+      toast.error('You must be signed in to convert a lead');
+      return;
+    }
+    if (!lead.property_id) {
+      toast.error('Select or create a property before converting');
+      return;
+    }
+    try {
+      // 1. Ensure a site exists for this property (creates one if none)
+      const site = await siteService.ensureDefaultForProperty(lead.property_id, {
+        name: `${lead.company_name || lead.contact_name || 'Primary'} Site`,
+        address: form.jobAddress || lead.job_address || '',
+      });
+
+      // 2. Create the project — inherits all lead contact info
+      const project = await projectService.create({
+        name: `${lead.company_name || lead.contact_name || 'New Client'} – ${form.issueSummary || lead.notes || 'Project'}`,
+        property_id: lead.property_id,
+        site_id: site.id,
+        client_name: lead.contact_name || lead.company_name || 'Client',
+        client_phone: lead.phone || '',
+        client_email: lead.email || '',
+        internal_owner_id: user.id,
+        status: 'Planning',
+        client_summary: form.issueSummary || lead.notes || '',
+        internal_notes: `Converted from lead. Urgency: ${lead.urgency || 'Medium'}. ${lead.access_notes ? 'Access: ' + lead.access_notes : ''}`.trim(),
+        start_date: new Date().toISOString().slice(0, 10),
+        end_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10),
+        total_budget: Number(lead.estimated_value ?? form.estimatedValue ?? 0),
+        spent_budget: 0,
+        client_visibility: { show_budget: true, show_timeline: true, show_invoices: true, show_contacts: true },
+      } as any);
+
+      // 3. Create a Contact record so this client appears in the Clients page
+      try {
+        const contact = await contactService.create({
+          name: lead.contact_name || lead.company_name || 'Client',
+          title: '',
+          company: lead.company_name || '',
+          email: lead.email || '',
+          phone: lead.phone || '',
+          type: 'Client',
+          property_id: lead.property_id,
+          preferred_channel: lead.preferred_channel,
+          notes: `Auto-created from lead intake on ${new Date().toLocaleDateString()}`,
+        });
+        // 4. Link the contact to the project
+        await contactService.addToProject(contact.id, project.id);
+      } catch (contactErr) {
+        // Contact creation failing should not block the project — log and continue
+        console.warn('Could not create contact record:', contactErr);
+      }
+
+      // 5. Mark the lead as converted and link it back to the project
+      const updatedLead = await leadService.update(lead.id, {
+        stage: 'Won',
+        project_id: project.id,
+        follow_up_status: 'Completed',
+        decision_notes: `Converted to project ${project.id} on ${new Date().toLocaleDateString()}`,
+      });
+      onLeadUpdated?.(updatedLead);
+      toast.success('Lead converted — project, site, and client created');
+      closeModal();
+      navigate(`/projects/${project.id}`);
+    } catch (error) {
+      console.error('Convert to project error:', error);
+      toast.error(error instanceof Error ? error.message : 'Unable to convert lead to project');
     }
   };
 
@@ -266,7 +403,7 @@ export function LeadIntakeModal({
         <div key={num} className="flex items-center gap-2">
           <div
             className={`w-6 h-6 rounded-full text-xs flex items-center justify-center ${
-              step === num ? 'bg-[#143352] text-white' : 'bg-neutral-200 text-neutral-600'
+              step === num ? 'bg-[#0f2749] text-white' : 'bg-neutral-200 text-neutral-600'
             }`}
           >
             {num}
@@ -292,7 +429,7 @@ export function LeadIntakeModal({
             className="border border-neutral-300 px-3 py-2 w-full"
           >
             <option value="">Select contact…</option>
-            {mockContacts.map((contact) => (
+            {contacts.map((contact) => (
               <option key={contact.id} value={contact.id}>
                 {contact.name} — {contact.company}
               </option>
@@ -302,7 +439,7 @@ export function LeadIntakeModal({
             <button
               type="button"
               onClick={() => setSelectedContactId('')}
-              className="text-xs text-[#143352] underline"
+              className="text-xs text-[#0f2749] underline"
             >
               Clear selection
             </button>
@@ -353,43 +490,49 @@ export function LeadIntakeModal({
         <div className="md:col-span-2 flex flex-col gap-2">
           <div className="flex items-center gap-4 text-sm text-neutral-600">
             <label className="flex items-center gap-2">
-              <input type="radio" name="campus-mode" value="existing" checked={form.campusMode === 'existing'} onChange={(e) => setForm({ ...form, campusMode: e.target.value as 'existing' | 'new' })} />
-              Existing Campus
+              <input type="radio" name="property-mode" value="existing" checked={form.propertyMode === 'existing'} onChange={(e) => setForm({ ...form, propertyMode: e.target.value as 'existing' | 'new' })} />
+              Existing Property
             </label>
             <label className="flex items-center gap-2">
-              <input type="radio" name="campus-mode" value="new" checked={form.campusMode === 'new'} onChange={(e) => setForm({ ...form, campusMode: e.target.value as 'existing' | 'new' })} />
-              Add New Campus
+              <input type="radio" name="property-mode" value="new" checked={form.propertyMode === 'new'} onChange={(e) => setForm({ ...form, propertyMode: e.target.value as 'existing' | 'new' })} />
+              Add New Property
             </label>
           </div>
-          {form.campusMode === 'existing' ? (
+          {form.propertyMode === 'existing' ? (
             <select
-              value={form.campusId}
-              onChange={(e) => setForm({ ...form, campusId: e.target.value })}
+              value={form.propertyId}
+              onChange={(e) => setForm({ ...form, propertyId: e.target.value })}
               className="border border-neutral-300 px-3 py-2"
             >
-              {mockCampuses.map((campus) => (
-                <option key={campus.id} value={campus.id}>
-                  {campus.name}
+              {properties.map((property) => (
+                <option key={property.id} value={property.id}>
+                  {property.name}
                 </option>
               ))}
             </select>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-2">
               <input
-                value={form.newCampusName}
-                onChange={(e) => setForm({ ...form, newCampusName: e.target.value })}
-                placeholder="Campus name"
+                value={form.newPropertyName}
+                onChange={(e) => setForm({ ...form, newPropertyName: e.target.value })}
+                placeholder="Property name"
                 className="border border-neutral-300 px-3 py-2"
               />
               <input
-                value={form.newCampusFunding}
-                onChange={(e) => setForm({ ...form, newCampusFunding: e.target.value })}
+                value={form.newPropertyAddress}
+                onChange={(e) => setForm({ ...form, newPropertyAddress: e.target.value })}
+                placeholder="Street address"
+                className="border border-neutral-300 px-3 py-2"
+              />
+              <input
+                value={form.newPropertyFunding}
+                onChange={(e) => setForm({ ...form, newPropertyFunding: e.target.value })}
                 placeholder="Funding source"
                 className="border border-neutral-300 px-3 py-2"
               />
               <select
-                value={form.newCampusPriority}
-                onChange={(e) => setForm({ ...form, newCampusPriority: e.target.value as Priority })}
+                value={form.newPropertyPriority}
+                onChange={(e) => setForm({ ...form, newPropertyPriority: e.target.value as Priority })}
                 className="border border-neutral-300 px-3 py-2"
               >
                 {(['Critical', 'High', 'Medium', 'Low'] as Priority[]).map((priority) => (
@@ -457,7 +600,7 @@ export function LeadIntakeModal({
         <input
           value={form.jobAddress}
           onChange={(e) => setForm({ ...form, jobAddress: e.target.value })}
-          placeholder="Address / Campus"
+          placeholder="Address / Property"
           className="border border-neutral-300 px-3 py-2"
         />
         <select
@@ -588,15 +731,16 @@ export function LeadIntakeModal({
         <button
           type="button"
           onClick={() => handleWizardSubmit('walkthrough')}
-          disabled={!decisionPreview || submitting}
+          disabled={submitting || !walkthroughDate}
           className="px-4 py-2 border border-neutral-300 text-neutral-700 disabled:opacity-60"
+          title={!walkthroughDate ? 'Pick a walkthrough date above first' : undefined}
         >
           Book Walkthrough
         </button>
         <button
           type="button"
           onClick={() => handleWizardSubmit('nurture')}
-          disabled={!decisionPreview || submitting}
+          disabled={submitting}
           className="px-4 py-2 border border-neutral-300 text-neutral-700 disabled:opacity-60"
         >
           Start Nurture Sequence
@@ -604,7 +748,7 @@ export function LeadIntakeModal({
         <button
           type="button"
           onClick={() => handleWizardSubmit('convert')}
-          disabled={!decisionPreview || submitting}
+          disabled={submitting}
           className="px-4 py-2 border border-neutral-300 text-neutral-700 disabled:opacity-60"
         >
           Convert to Project
@@ -613,7 +757,7 @@ export function LeadIntakeModal({
           type="button"
           onClick={() => handleWizardSubmit('lead')}
           disabled={submitting}
-          className="px-4 py-2 bg-[#143352] text-white disabled:opacity-60"
+          className="px-4 py-2 bg-[#0f2749] text-white disabled:opacity-60"
         >
           Save as Lead Only
         </button>
@@ -643,23 +787,23 @@ export function LeadIntakeModal({
           <div className="p-6 space-y-4">
             <div className="bg-emerald-50 border border-emerald-200 p-4 text-emerald-900">
               <p className="font-semibold">Lead captured</p>
-              <p className="text-sm">{successLead.companyName} — {successLead.contactName}</p>
-              <p className="text-xs text-emerald-800">Status: {successLead.stage} · Channel: {successLead.intakeChannel}</p>
+              <p className="text-sm">{successLead.company_name} — {successLead.contact_name}</p>
+              <p className="text-xs text-emerald-800">Status: {successLead.stage} · Channel: {successLead.intake_channel}</p>
             </div>
             <div className="border border-neutral-200 p-4 space-y-2 text-sm text-neutral-700">
               <p className="font-semibold text-neutral-900">Recommended Next Step</p>
               <p className="text-neutral-600">
-                {(successLead.recommendedNextStep && LEAD_NEXT_STEP_LABELS[successLead.recommendedNextStep]) || 'Review intake details'}
+                {(successLead.recommended_next_step && LEAD_NEXT_STEP_LABELS[successLead.recommended_next_step]) || 'Review intake details'}
               </p>
-              {successLead.decisionNotes && <p className="text-neutral-500">{successLead.decisionNotes}</p>}
+              {successLead.decision_notes && <p className="text-neutral-500">{successLead.decision_notes}</p>}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <button
                 onClick={() => {
                   if (successLead) {
                     saveWalkthroughDraftFromLead(successLead);
+                    navigate(`/walkthroughs/new/${successLead.id}`);
                   }
-                  navigate('/walkthroughs?from=intake');
                   closeModal();
                 }}
                 className="px-4 py-2 border border-neutral-300 text-neutral-700"
@@ -667,14 +811,29 @@ export function LeadIntakeModal({
                 Book Walkthrough
               </button>
               <button
-                onClick={() => toast.success('Nurture sequence triggered')}
+                onClick={async () => {
+                  if (!successLead) return;
+                  try {
+                    const updated = await leadService.update(successLead.id, {
+                      stage: 'Qualified',
+                      follow_up_status: 'InProgress',
+                      recommended_next_step: 'NurtureSequence',
+                      decision_notes: 'Nurture sequence initiated from intake modal',
+                    });
+                    onLeadUpdated?.(updated);
+                    toast.success('Nurture sequence started');
+                    closeModal();
+                  } catch (err) {
+                    toast.error('Could not start nurture sequence');
+                  }
+                }}
                 className="px-4 py-2 border border-neutral-300 text-neutral-700"
               >
                 Start Nurture Sequence
               </button>
               <button
-                onClick={() => {
-                  navigate('/leads');
+                onClick={async () => {
+                  if (successLead) await convertLeadToProject(successLead);
                 }}
                 className="px-4 py-2 border border-neutral-300 text-neutral-700"
               >
@@ -682,9 +841,9 @@ export function LeadIntakeModal({
               </button>
               <button
                 onClick={closeModal}
-                className="px-4 py-2 bg-[#143352] text-white"
+                className="px-4 py-2 bg-[#0f2749] text-white"
               >
-                Save as Lead Only
+                Done
               </button>
             </div>
           </div>
@@ -704,7 +863,7 @@ export function LeadIntakeModal({
                   type="button"
                   onClick={() => setStep((prev) => Math.min(3, prev + 1))}
                   disabled={(step === 1 && !canProceedStep1) || (step === 2 && !canProceedStep2)}
-                  className="px-4 py-2 bg-[#143352] text-white disabled:opacity-60"
+                  className="px-4 py-2 bg-[#0f2749] text-white disabled:opacity-60"
                 >
                   Next
                 </button>

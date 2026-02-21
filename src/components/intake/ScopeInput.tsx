@@ -53,7 +53,7 @@ export function ScopeInput({ scopeText, onScopeChange, selectedTemplate, onTempl
         </label>
         <div className="text-xs text-neutral-500">
           <p className="uppercase tracking-[0.3em]">Tips</p>
-          <p>Include building age, campus, critical systems, constraints, and anything historic or hazardous.</p>
+          <p>Include building age, property, critical systems, constraints, and anything historic or hazardous.</p>
         </div>
       </div>
     </section>

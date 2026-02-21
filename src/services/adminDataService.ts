@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import { quoteService, type QuoteRecord } from './quoteService';
 
 export type DashboardWorkStatus =
   | 'Requested'
@@ -13,50 +14,53 @@ export type DashboardWorkStatus =
 
 export interface DashboardWorkRequest {
   id: string;
-  requestNumber: string;
+  request_number: string;
   title: string;
   status: DashboardWorkStatus;
-  rawStatus: string;
+  raw_status: string;
   priority?: string | null;
-  campusId?: string | null;
-  campusName?: string | null;
-  estimatedCost?: number | null;
+  property_id?: string | null;
+  property_name?: string | null;
+  estimated_cost?: number | null;
 }
 
-export interface DashboardCampus {
+export interface DashboardProperty {
   id: string;
   name: string;
   priority?: string | null;
-  fundingSource?: string | null;
+  funding_source?: string | null;
 }
 
 export interface DashboardProject {
   id: string;
   name: string;
-  clientName: string;
-  startDate: string;
-  endDate: string;
-  totalBudget: number;
-  spentBudget: number;
+  client_name: string;
+  start_date: string;
+  end_date: string;
+  total_budget: number;
+  spent_budget: number;
   status: string;
+  property_id: string | null;
 }
 
 export interface DashboardInvoice {
   id: string;
-  invoiceNumber: string;
-  totalAmount: number;
+  invoice_number: string;
+  total_amount: number;
   status: string;
-  submittedAt?: string | null;
-  paidAt?: string | null;
+  submitted_at?: string | null;
+  paid_at?: string | null;
 }
 
 export interface DashboardMetrics {
-  activeValue: number;
-  inProgressCount: number;
-  awaitingApprovalCount: number;
-  completedCount: number;
-  blockedCount: number;
+  active_value: number;
+  in_progress_count: number;
+  awaiting_approval_count: number;
+  completed_count: number;
+  blocked_count: number;
 }
+
+export type DashboardQuote = QuoteRecord;
 
 const STATUS_MAP: Record<string, DashboardWorkStatus> = {
   Intake: 'Requested',
@@ -77,36 +81,37 @@ function normalizeStatus(status?: string | null): DashboardWorkStatus {
 
 export function mapMetrics(workRequests: DashboardWorkRequest[]): DashboardMetrics {
   const initial: DashboardMetrics = {
-    activeValue: 0,
-    inProgressCount: 0,
-    awaitingApprovalCount: 0,
-    completedCount: 0,
-    blockedCount: 0,
+    active_value: 0,
+    in_progress_count: 0,
+    awaiting_approval_count: 0,
+    completed_count: 0,
+    blocked_count: 0,
   };
 
   return workRequests.reduce((acc, request) => {
-    acc.activeValue += request.estimatedCost ?? 0;
+    acc.active_value += request.estimated_cost ?? 0;
     switch (request.status) {
       case 'InProgress':
       case 'Scheduled':
-        acc.inProgressCount += 1;
+        acc.in_progress_count += 1;
         break;
       case 'AwaitingApproval':
-        acc.awaitingApprovalCount += 1;
+        acc.awaiting_approval_count += 1;
         break;
       case 'Completed':
-        acc.completedCount += 1;
+        acc.completed_count += 1;
         break;
       case 'Blocked':
-        acc.blockedCount += 1;
+        acc.blocked_count += 1;
         break;
     }
     return acc;
   }, initial);
 }
 
-export async function fetchAdminWorkRequests(): Promise<DashboardWorkRequest[]> {
-  const { data, error } = await supabase
+export async function fetchAdminWorkRequests(propertyIds?: string[]): Promise<DashboardWorkRequest[]> {
+  if (propertyIds && propertyIds.length === 0) return [];
+  let query = supabase
     .from('work_requests')
     .select(
       `
@@ -117,12 +122,18 @@ export async function fetchAdminWorkRequests(): Promise<DashboardWorkRequest[]> 
         status,
         priority,
         estimated_cost,
-        campus_id,
-        campuses(id, name, priority)
+        property_id,
+        properties(id, name, priority)
       `
     )
     .order('created_at', { ascending: false })
     .limit(50);
+
+  if (propertyIds && propertyIds.length > 0) {
+    query = query.in('property_id', propertyIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -132,23 +143,25 @@ export async function fetchAdminWorkRequests(): Promise<DashboardWorkRequest[]> 
     const normalizedStatus = normalizeStatus(row.status);
     return {
       id: row.id,
-      requestNumber: row.request_number ?? 'WR-UNKNOWN',
+      request_number: row.request_number ?? 'WR-UNKNOWN',
       title: row.property || row.description || 'Work Request',
       status: normalizedStatus,
-      rawStatus: row.status ?? 'Unknown',
+      raw_status: row.status ?? 'Unknown',
       priority: row.priority,
-      campusId: row.campus_id ?? row.campuses?.id ?? null,
-      campusName: row.campuses?.name ?? null,
-      estimatedCost: row.estimated_cost ?? null,
+      property_id: row.property_id ?? row.properties?.id ?? null,
+      property_name: row.properties?.name ?? null,
+      estimated_cost: row.estimated_cost ?? null,
     } satisfies DashboardWorkRequest;
   });
 }
 
-export async function fetchAdminCampuses(): Promise<DashboardCampus[]> {
-  const { data, error } = await supabase
-    .from('campuses')
-    .select('id, name, priority, funding_source')
-    .order('name', { ascending: true });
+export async function fetchAdminProperties(propertyIds?: string[]): Promise<DashboardProperty[]> {
+  if (propertyIds && propertyIds.length === 0) return [];
+  let query = supabase.from('properties').select('id, name, priority, funding_source').order('name', { ascending: true });
+  if (propertyIds && propertyIds.length > 0) {
+    query = query.in('id', propertyIds);
+  }
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -158,16 +171,23 @@ export async function fetchAdminCampuses(): Promise<DashboardCampus[]> {
     id: row.id,
     name: row.name,
     priority: row.priority ?? null,
-    fundingSource: row.funding_source ?? null,
-  } satisfies DashboardCampus));
+    funding_source: row.funding_source ?? null,
+  } satisfies DashboardProperty));
 }
 
-export async function fetchAdminInvoices(): Promise<DashboardInvoice[]> {
-  const { data, error } = await supabase
+export async function fetchAdminInvoices(propertyIds?: string[]): Promise<DashboardInvoice[]> {
+  if (propertyIds && propertyIds.length === 0) return [];
+  let query = supabase
     .from('invoices')
-    .select('id, invoice_number, total_amount, status, submitted_at, paid_at')
+    .select('id, invoice_number, total_amount, status, submitted_at, paid_at, property_id')
     .order('created_at', { ascending: false })
     .limit(10);
+
+  if (propertyIds && propertyIds.length > 0) {
+    query = query.in('property_id', propertyIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -175,19 +195,29 @@ export async function fetchAdminInvoices(): Promise<DashboardInvoice[]> {
 
   return (data ?? []).map((row: any) => ({
     id: row.id,
-    invoiceNumber: row.invoice_number ?? 'INV-UNKNOWN',
-    totalAmount: Number(row.total_amount ?? 0),
+    invoice_number: row.invoice_number ?? 'INV-UNKNOWN',
+    total_amount: Number(row.total_amount ?? 0),
     status: row.status ?? 'Draft',
-    submittedAt: row.submitted_at,
-    paidAt: row.paid_at,
+    submitted_at: row.submitted_at,
+    paid_at: row.paid_at,
   } satisfies DashboardInvoice));
 }
-export async function fetchAdminProjects(): Promise<DashboardProject[]> {
-  const { data, error } = await supabase
+export async function fetchAdminProjects(propertyIds?: string[], limit = 8): Promise<DashboardProject[]> {
+  if (propertyIds && propertyIds.length === 0) return [];
+  let query = supabase
     .from('projects')
-    .select('id, name, client_name, start_date, end_date, total_budget, spent_budget, status')
-    .order('created_at', { ascending: false })
-    .limit(10);
+    .select('id, name, client_name, start_date, end_date, total_budget, spent_budget, status, property_id')
+    .order('created_at', { ascending: false });
+
+  if (limit !== undefined) {
+    query = query.limit(limit);
+  }
+
+  if (propertyIds && propertyIds.length > 0) {
+    query = query.in('property_id', propertyIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
@@ -196,11 +226,17 @@ export async function fetchAdminProjects(): Promise<DashboardProject[]> {
   return (data ?? []).map((row: any) => ({
     id: row.id,
     name: row.name,
-    clientName: row.client_name,
-    startDate: row.start_date,
-    endDate: row.end_date,
-    totalBudget: Number(row.total_budget ?? 0),
-    spentBudget: Number(row.spent_budget ?? 0),
+    client_name: row.client_name,
+    start_date: row.start_date,
+    end_date: row.end_date,
+    total_budget: Number(row.total_budget ?? 0),
+    spent_budget: Number(row.spent_budget ?? 0),
     status: row.status,
+    property_id: row.property_id ?? null,
   } satisfies DashboardProject));
+}
+
+export async function fetchAdminQuotes(propertyIds: string[], limit = 8): Promise<DashboardQuote[]> {
+  if (propertyIds.length === 0) return [];
+  return quoteService.listByProperties(propertyIds, { limit });
 }

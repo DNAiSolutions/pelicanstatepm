@@ -34,7 +34,7 @@ export function PortalProjectDetailPage() {
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
         <div className="bg-white p-6 border border-neutral-200 text-center space-y-2">
           <p className="font-heading font-semibold text-neutral-900">Project not found</p>
-          <Link to="/client-portal/projects" className="text-[#143352] text-sm">
+          <Link to="/client-portal/projects" className="text-[#0f2749] text-sm">
             Back to projects
           </Link>
         </div>
@@ -52,7 +52,7 @@ export function PortalProjectDetailPage() {
             <p className="text-sm text-neutral-600">Budget {formatCurrency(project.spentBudget)} / {formatCurrency(project.totalBudget)}</p>
             <p className="text-xs text-neutral-500">{companyName} • Contact: {accountName}</p>
             {viewingMessage && <p className="text-xs text-emerald-600">{viewingMessage}</p>}
-            <Link to={`/client-portal/projects${contactId ? `?contactId=${contactId}` : ''}`} className="text-xs text-[#143352] underline">
+            <Link to={`/client-portal/projects${contactId ? `?contactId=${contactId}` : ''}`} className="text-xs text-[#0f2749] underline">
               ← Back to projects
             </Link>
           </div>
@@ -78,7 +78,7 @@ export function PortalProjectDetailPage() {
             <p className="text-sm text-neutral-500">Based on active work orders</p>
           </div>
           <div className="h-3 bg-neutral-100">
-            <div className="h-full bg-[#143352]" style={{ width: `${overallProgress}%` }} />
+            <div className="h-full bg-[#0f2749]" style={{ width: `${overallProgress}%` }} />
           </div>
         </section>
 

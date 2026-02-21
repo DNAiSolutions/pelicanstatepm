@@ -1,6 +1,6 @@
 import { Plus, ChevronDown } from 'lucide-react';
-import type { Project } from '../../data/pipeline';
-import { mockCampuses } from '../../data/pipeline';
+import type { Project } from '../../types';
+import { mockProperties } from '../../data/pipeline';
 
 interface ProjectClientsPanelProps {
   groupedByClient: [string, Project[]][];
@@ -35,7 +35,7 @@ export function ProjectClientsPanel({
         <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Clients</p>
         <button
           onClick={onNewProjectClick}
-          className="text-sm text-[#143352] flex items-center gap-1"
+          className="text-sm text-[#0f2749] flex items-center gap-1"
         >
           <Plus className="w-4 h-4" />
           New
@@ -70,14 +70,14 @@ export function ProjectClientsPanel({
                       onClick={() => onProjectSelect(project.id)}
                       className={`w-full text-left px-2 py-1 border border-neutral-200 text-sm truncate ${
                         project.id === selectedProjectId
-                          ? 'bg-[#143352] text-white'
+                          ? 'bg-[#0f2749] text-white'
                           : 'bg-white text-neutral-700'
                       }`}
                     >
                       {project.name}
                       <span className="block text-xs text-neutral-500">
-                        {mockCampuses.find((c) => c.id === project.campusId)?.name ||
-                          'Campus TBD'}
+                        {mockProperties.find((c) => c.id === project.property_id)?.name ||
+                          'Property TBD'}
                       </span>
                     </button>
                   ))}

@@ -34,7 +34,7 @@ export function JobConversation({ conversation, onStart, onAnswer, onGeneratePla
             onStart(draftSummary.trim());
             setDraftSummary('');
           }}
-          className="px-4 py-2 text-sm uppercase tracking-[0.3em] bg-[#143352] text-white disabled:opacity-60"
+          className="px-4 py-2 text-sm uppercase tracking-[0.3em] bg-[#0f2749] text-white disabled:opacity-60"
           disabled={!draftSummary.trim()}
         >
           Start AI Intake
@@ -56,7 +56,7 @@ export function JobConversation({ conversation, onStart, onAnswer, onGeneratePla
           <button
             type="button"
             onClick={onGeneratePlan}
-            className="px-3 py-1 text-xs uppercase tracking-[0.3em] border border-[#143352] text-[#143352] disabled:opacity-60"
+            className="px-3 py-1 text-xs uppercase tracking-[0.3em] border border-[#0f2749] text-[#0f2749] disabled:opacity-60"
             disabled={generatingPlan}
           >
             {generatingPlan ? 'Generating…' : 'Generate Work Plan'}
@@ -65,7 +65,7 @@ export function JobConversation({ conversation, onStart, onAnswer, onGeneratePla
       </div>
       <div className="space-y-2 max-h-64 overflow-y-auto border border-neutral-100 p-3 bg-neutral-50 text-sm">
         {conversation.messages.map((message) => (
-          <div key={message.id} className={`${message.role === 'Assistant' ? 'text-[#143352]' : 'text-neutral-800'}`}>
+          <div key={message.id} className={`${message.role === 'Assistant' ? 'text-[#0f2749]' : 'text-neutral-800'}`}>
             <p className="text-[11px] uppercase tracking-[0.3em] text-neutral-400">{message.role}</p>
             <p>{message.content}</p>
           </div>

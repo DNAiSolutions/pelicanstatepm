@@ -1,11 +1,9 @@
-import type { Project } from '../../data/pipeline';
-
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
 export interface ProjectFinancialsProps {
-  project: Project;
-  onUpdate?: (project: Project) => void;
+  project: any;
+  onUpdate?: (project: any) => void;
 }
 
 export function ProjectFinancials({ project }: ProjectFinancialsProps) {
@@ -42,7 +40,7 @@ export function ProjectFinancials({ project }: ProjectFinancialsProps) {
             <div key={idx} className="flex items-center gap-2 text-xs text-neutral-500">
               <span>Q{idx + 1}</span>
               <div className="flex-1 h-2 bg-neutral-100 rounded-full">
-                <div className="h-full bg-[#143352] rounded-full" style={{ width: `${value}%` }} />
+                <div className="h-full bg-[#0f2749] rounded-full" style={{ width: `${value}%` }} />
               </div>
             </div>
           ))}

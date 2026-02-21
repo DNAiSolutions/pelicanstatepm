@@ -53,7 +53,7 @@ export function DashboardWorkOrders({
         <h2 className="text-xl font-heading font-bold text-neutral-900">Recent Work Orders</h2>
         <button
           onClick={onViewAllClick}
-          className="text-sm text-[#143352] hover:text-[#143352]/80 font-medium"
+          className="text-sm text-[#0f2749] hover:text-[#0f2749]/80 font-medium"
         >
           View All →
         </button>
@@ -65,7 +65,7 @@ export function DashboardWorkOrders({
           onClick={() => onStatusFilterChange('all')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             statusFilter === 'all'
-              ? 'border-[#143352] text-[#143352]'
+              ? 'border-[#0f2749] text-[#0f2749]'
               : 'border-transparent text-neutral-600 hover:text-neutral-900'
           }`}
         >
@@ -75,7 +75,7 @@ export function DashboardWorkOrders({
           onClick={() => onStatusFilterChange('inProgress')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             statusFilter === 'inProgress'
-              ? 'border-[#143352] text-[#143352]'
+              ? 'border-[#0f2749] text-[#0f2749]'
               : 'border-transparent text-neutral-600 hover:text-neutral-900'
           }`}
         >
@@ -85,7 +85,7 @@ export function DashboardWorkOrders({
           onClick={() => onStatusFilterChange('completed')}
           className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
             statusFilter === 'completed'
-              ? 'border-[#143352] text-[#143352]'
+              ? 'border-[#0f2749] text-[#0f2749]'
               : 'border-transparent text-neutral-600 hover:text-neutral-900'
           }`}
         >

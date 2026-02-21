@@ -60,7 +60,7 @@ export function EstimateBuilderPage() {
   const addLineItem = () => {
     setLineItems([
       ...lineItems,
-      { description: '', amount: 0 },
+      { description: '', amount: 0, quantity: 1 },
     ]);
   };
 

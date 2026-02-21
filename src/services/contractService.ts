@@ -1,196 +1,165 @@
+import { supabase } from './supabaseClient';
+import type { Contract, Milestone, ScheduleOfValuesEntry, CostLedgerEntry } from '../types';
+// authzService and auditLogService reserved for future use
+// import { authzService } from './authzService';
+// import { auditLogService } from './auditLogService';
 import {
-  mockContracts,
-  mockMilestones,
-  mockScheduleOfValues,
-  mockCostLedgerEntries,
-  type Contract,
-  type Milestone,
-  type ScheduleOfValuesEntry,
-  type CostLedgerEntry,
-  type ContractType,
-  type BillingMethod,
-} from '../data/pipeline';
-import { authzService } from './authzService';
-import { auditLogService } from './auditLogService';
+  mapContractRow,
+  mapMilestoneRow,
+  mapScheduleOfValuesRow,
+  mapCostLedgerRow,
+} from '../utils/supabaseMappers';
 
-type NewContractPayload = Omit<Contract, 'id' | 'status' | 'createdBy'> & {
-  createdBy: string;
+type NewContractPayload = Omit<Contract, 'id' | 'status' | 'created_at' | 'updated_at'> & {
   status?: Contract['status'];
 };
 
-type MilestonePayload = Omit<Milestone, 'id' | 'status'> & {
+type MilestonePayload = Omit<Milestone, 'id' | 'status' | 'created_at'> & {
   status?: Milestone['status'];
 };
 
-type ScheduleOfValuesPayload = Omit<ScheduleOfValuesEntry, 'id' | 'lastUpdated' | 'amountEarned'> & {
-  percentComplete?: number;
-  amountEarned?: number;
+
+type CostLedgerPayload = Omit<CostLedgerEntry, 'id' | 'recorded_at'> & {
+  recorded_at?: string;
 };
 
-type CostLedgerPayload = Omit<CostLedgerEntry, 'id' | 'recordedAt'> & {
-  recordedAt?: string;
-};
-
-const id = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
+const toCostLedgerRow = (payload: CostLedgerPayload) => ({
+  project_id: payload.project_id,
+  contract_id: payload.contract_id ?? null,
+  category: payload.category,
+  description: payload.description,
+  committed_amount: payload.committed_amount,
+  actual_amount: payload.actual_amount,
+  vendor_id: payload.vendor_id,
+  invoice_reference: payload.invoice_reference,
+  recorded_by: payload.recorded_by,
+  recorded_at: payload.recorded_at ?? new Date().toISOString(),
+});
 
 function clamp(value: number, min = 0, max = 1) {
   return Math.min(Math.max(value, min), max);
 }
 
 export const contractService = {
-  listByProject(projectId: string): Contract[] {
-    return mockContracts.filter((contract) => contract.projectId === projectId);
+  async listByProject(projectId: string): Promise<Contract[]> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .select('*')
+      .eq('project_id', projectId)
+      .order('created_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapContractRow);
   },
 
-  getById(contractId: string): Contract | undefined {
-    return mockContracts.find((contract) => contract.id === contractId);
+  async getById(contractId: string): Promise<Contract | undefined> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .select('*')
+      .eq('id', contractId)
+      .maybeSingle();
+    if (error) throw error;
+    return data ? mapContractRow(data) : undefined;
   },
 
-  create(payload: NewContractPayload): Contract {
-    const newContract: Contract = {
-      ...payload,
-      id: id('contract'),
-      status: payload.status || 'Draft',
-    };
-    mockContracts.push(newContract);
-    return newContract;
+  async create(payload: NewContractPayload): Promise<Contract> {
+    const { data, error } = await supabase
+      .from('contracts')
+      .insert([{
+        project_id: payload.project_id,
+        contract_type: payload.contract_type,
+        billing_method: payload.billing_method,
+        contract_value: payload.contract_value,
+        fee_percentage: payload.fee_percentage,
+        retainage_percentage: payload.retainage_percentage,
+        start_date: payload.start_date,
+        end_date: payload.end_date,
+        status: payload.status || 'Draft',
+        created_by: payload.created_by,
+        notes: payload.notes,
+      }])
+      .select()
+      .single();
+    if (error) throw error;
+    return mapContractRow(data);
   },
 
-  update(contractId: string, updates: Partial<Contract>): Contract | undefined {
-    const contract = this.getById(contractId);
-    if (!contract) return undefined;
-    Object.assign(contract, updates);
-    return contract;
+  // Milestones
+  async getMilestones(contractId: string): Promise<Milestone[]> {
+    const { data, error } = await supabase
+      .from('contract_milestones')
+      .select('*')
+      .eq('contract_id', contractId)
+      .order('scheduled_date', { ascending: true });
+    if (error) throw error;
+    return (data ?? []).map(mapMilestoneRow);
   },
 
-  addMilestone(contractId: string, payload: MilestonePayload): Milestone {
-    const milestone: Milestone = {
-      ...payload,
-      id: id('milestone'),
-      contractId,
-      status: payload.status || 'Pending',
-    };
-    mockMilestones.push(milestone);
-    return milestone;
+  async addMilestone(payload: MilestonePayload): Promise<Milestone> {
+    const { data, error } = await supabase
+      .from('contract_milestones')
+      .insert([{
+        contract_id: payload.contract_id,
+        name: payload.name,
+        description: payload.description,
+        scheduled_date: payload.scheduled_date,
+        amount: payload.amount,
+        status: payload.status || 'Pending',
+      }])
+      .select()
+      .single();
+    if (error) throw error;
+    return mapMilestoneRow(data);
   },
 
-  updateMilestone(milestoneId: string, updates: Partial<Milestone>): Milestone | undefined {
-    const milestone = mockMilestones.find((ms) => ms.id === milestoneId);
-    if (!milestone) return undefined;
-    Object.assign(milestone, updates);
-    return milestone;
-  },
-
-  getMilestones(contractId: string): Milestone[] {
-    return mockMilestones
-      .filter((milestone) => milestone.contractId === contractId)
-      .sort((a, b) => {
-        const aDate = a.scheduledDate ? new Date(a.scheduledDate).getTime() : 0;
-        const bDate = b.scheduledDate ? new Date(b.scheduledDate).getTime() : 0;
-        return aDate - bDate;
-      });
-  },
-
-  addScheduleOfValues(contractId: string, payload: ScheduleOfValuesPayload): ScheduleOfValuesEntry {
-    const entry: ScheduleOfValuesEntry = {
-      ...payload,
-      id: id('sov'),
-      contractId,
-      percentComplete: payload.percentComplete ?? 0,
-      amountEarned: payload.amountEarned ?? 0,
-      lastUpdated: new Date().toISOString(),
-    };
-    mockScheduleOfValues.push(entry);
-    return entry;
-  },
-
-  updateScheduleOfValues(entryId: string, updates: Partial<ScheduleOfValuesEntry>): ScheduleOfValuesEntry | undefined {
-    const entry = mockScheduleOfValues.find((line) => line.id === entryId);
-    if (!entry) return undefined;
-    Object.assign(entry, updates, { lastUpdated: new Date().toISOString() });
-    return entry;
-  },
-
-  getScheduleOfValues(contractId: string): ScheduleOfValuesEntry[] {
-    return mockScheduleOfValues.filter((entry) => entry.contractId === contractId);
-  },
-
-  addCostLedgerEntry(payload: CostLedgerPayload): CostLedgerEntry {
-    authzService.requireRole(payload.recordedBy, ['Owner', 'Finance']);
-    const entry: CostLedgerEntry = {
-      ...payload,
-      id: id('cle'),
-      recordedAt: payload.recordedAt || new Date().toISOString(),
-    };
-    mockCostLedgerEntries.push(entry);
-    auditLogService.record({
-      entity: 'Contract',
-      entityId: payload.contractId,
-      action: 'LEDGER_ENTRY',
-      actorId: payload.recordedBy,
-      metadata: {
-        entryId: entry.id,
-        category: entry.category,
-        committed: entry.committedAmount,
-        actual: entry.actualAmount,
-      },
-    });
-    return entry;
-  },
-
-  listCostLedger(projectId: string, contractId?: string): CostLedgerEntry[] {
-    return mockCostLedgerEntries.filter((entry) => entry.projectId === projectId && (!contractId || entry.contractId === contractId));
-  },
-
-  getFinancialSummary(contractId: string) {
-    const contract = this.getById(contractId);
-    if (!contract) {
-      return {
-        contractValue: 0,
-        amountBilled: 0,
-        amountEarned: 0,
-        retainageHeld: 0,
-        retainageReleased: 0,
-        grossMargin: 0,
-        grossMarginPercent: 0,
-      };
+  // Cost Ledger
+  async listCostLedger(projectId: string, contractId?: string): Promise<CostLedgerEntry[]> {
+    let query = supabase
+      .from('contract_cost_ledger')
+      .select('*')
+      .eq('project_id', projectId);
+    
+    if (contractId) {
+      query = query.eq('contract_id', contractId);
     }
 
-    const milestones = this.getMilestones(contractId);
-    const amountBilled = milestones.filter((ms) => ['ReadyToBill', 'Invoiced', 'Paid'].includes(ms.status)).reduce((sum, ms) => sum + ms.amount, 0);
-    const retainageHeld = (contract.retainagePercentage || 0) / 100 * amountBilled;
-    const ledgerEntries = mockCostLedgerEntries.filter((entry) => entry.contractId === contractId);
-    const actualCost = ledgerEntries.reduce((sum, entry) => sum + (entry.actualAmount || entry.committedAmount || 0), 0);
-    const amountEarned = mockScheduleOfValues
-      .filter((entry) => entry.contractId === contractId)
-      .reduce((sum, entry) => sum + entry.amountEarned, 0);
-
-    const grossMargin = Math.max((contract.contractValue || amountEarned) - actualCost, 0);
-    const grossMarginPercent = contract.contractValue ? clamp(grossMargin / contract.contractValue) : 0;
-
-    return {
-      contractValue: contract.contractValue,
-      amountBilled,
-      amountEarned,
-      retainageHeld,
-      retainageReleased: 0,
-      grossMargin,
-      grossMarginPercent,
-    };
+    const { data, error } = await query.order('recorded_at', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapCostLedgerRow);
   },
 
-  getBillingProfile(contractId: string): {
-    contractType?: ContractType;
-    billingMethod?: BillingMethod;
-    milestones: Milestone[];
-    scheduleOfValues: ScheduleOfValuesEntry[];
-  } {
-    const contract = this.getById(contractId);
-    return {
-      contractType: contract?.contractType,
-      billingMethod: contract?.billingMethod,
-      milestones: this.getMilestones(contractId),
-      scheduleOfValues: this.getScheduleOfValues(contractId),
-    };
+  async postCostEntry(payload: CostLedgerPayload): Promise<CostLedgerEntry> {
+    const row = toCostLedgerRow(payload);
+    const { data, error } = await supabase
+      .from('contract_cost_ledger')
+      .insert([row])
+      .select()
+      .single();
+    if (error) throw error;
+    return mapCostLedgerRow(data);
+  },
+
+  // Schedule of Values
+  async getScheduleOfValues(contractId: string): Promise<ScheduleOfValuesEntry[]> {
+    const { data, error } = await supabase
+      .from('contract_sov')
+      .select('*')
+      .eq('contract_id', contractId)
+      .order('budget_amount', { ascending: false });
+    if (error) throw error;
+    return (data ?? []).map(mapScheduleOfValuesRow);
+  },
+
+  async updateSOVProgress(id: string, progress: number): Promise<ScheduleOfValuesEntry> {
+    const { data, error } = await supabase
+      .from('contract_sov')
+      .update({ 
+        percent_complete: clamp(progress, 0, 100),
+        last_updated: new Date().toISOString()
+      })
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapScheduleOfValuesRow(data);
   },
 };

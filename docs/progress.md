@@ -13,8 +13,8 @@
   - WorkRequest (with strict status gates)
   - Estimate (approval workflow)
   - HistoricDocumentation (audit-ready)
-  - Invoice (campus/funding splits)
-  - Schedule, WeeklyUpdate, Campus, RatesAndServices
+  - Invoice (property/funding splits)
+  - Schedule, WeeklyUpdate, Property, RatesAndServices
 - **Implementation Plan**: Created comprehensive plan with Layer 1/2/3 architecture
 - **Findings**: Documented client pain points, requirements, workflow expectations
 

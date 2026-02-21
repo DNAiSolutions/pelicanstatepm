@@ -94,7 +94,7 @@ export function DashboardNeedsAttention({
           </div>
           <button
             onClick={onViewAllInvoicesClick}
-            className="text-sm text-[#143352] hover:text-[#143352]/80 font-medium"
+            className="text-sm text-[#0f2749] hover:text-[#0f2749]/80 font-medium"
           >
             View All →
           </button>

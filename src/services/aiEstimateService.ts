@@ -25,13 +25,13 @@ const STATUS_PRIORITY: Record<WorkOrderStatus, number> = {
   Closed: 10,
 };
 
-function resolveWalkthroughPlan(project: Project, leads: Lead[]): WalkthroughPlan | undefined {
+async function resolveWalkthroughPlan(project: Project, leads: Lead[]): Promise<WalkthroughPlan | undefined> {
   if (project.walkthroughPlan) return project.walkthroughPlan;
   for (const lead of leads) {
     if (lead.walkthroughPlan) return lead.walkthroughPlan;
     if (lead.walkthroughSessionIds?.length) {
       for (const sessionId of lead.walkthroughSessionIds) {
-        const session = walkthroughSessionService.getById(sessionId);
+        const session = await walkthroughSessionService.getById(sessionId);
         if (session?.finalizedPlan) return session.finalizedPlan;
         if (session?.aiPlan) return session.aiPlan;
       }
@@ -105,8 +105,8 @@ function pickWorkOrder(workOrders: WorkOrder[]): WorkOrder | undefined {
 }
 
 export const aiEstimateService = {
-  buildLineItems(project: Project, leads: Lead[], workOrders: WorkOrder[]): LineItem[] {
-    const plan = resolveWalkthroughPlan(project, leads);
+  async buildLineItems(project: Project, leads: Lead[], workOrders: WorkOrder[]): Promise<LineItem[]> {
+    const plan = await resolveWalkthroughPlan(project, leads);
     if (plan) {
       const items = lineItemsFromPlan(plan);
       if (items.length) return items;
@@ -119,7 +119,7 @@ export const aiEstimateService = {
     if (!targetWorkOrder) {
       throw new Error('No work orders are linked to this project yet. Create a work order before generating an estimate.');
     }
-    const lineItems = this.buildLineItems(project, leads, workOrders);
+    const lineItems = await this.buildLineItems(project, leads, workOrders);
     if (!lineItems.length) {
       throw new Error('Unable to build estimate line items from the available walkthrough data.');
     }

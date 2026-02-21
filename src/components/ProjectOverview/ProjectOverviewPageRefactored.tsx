@@ -3,12 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import {
-  mockCampuses,
+  mockProperties,
   mockContacts,
   mockLeads,
   mockSites,
   mockUsers,
-  type Project,
   type ConsultationChecklist as ConsultationChecklistModel,
   type IntakeResearchSnippet,
   type ScopeAnalysisResult,
@@ -16,6 +15,7 @@ import {
   type Priority,
   type TaskTemplate,
 } from '../../data/pipeline';
+import type { Project } from '../../types';
 import { projectService } from '../../services/projectService';
 import { projectTaskService, type TemplateTask, type TemplateMaterial, type TemplateLabor, type ProjectPlan } from '../../services/projectTaskService';
 import { retainerRateService } from '../../services/retainerRateService';
@@ -86,12 +86,12 @@ export function ProjectOverviewPageRefactored() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string>('');
   const [search, setSearch] = useState('');
-  const [campusFilter, setCampusFilter] = useState('');
+  const [propertyFilter, setPropertyFilter] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState({
     name: '',
-    campusId: mockCampuses[0]?.id || '',
+    propertyId: mockProperties[0]?.id || '',
     locationNotes: '',
     clientName: '',
     clientEmail: '',
@@ -103,10 +103,10 @@ export function ProjectOverviewPageRefactored() {
     contactId: '',
     clientMode: 'existing' as 'existing' | 'new',
     existingClient: '',
-    campusMode: 'existing' as 'existing' | 'new',
-    newCampusName: '',
-    newCampusFunding: '',
-    newCampusPriority: 'Medium' as Priority,
+    propertyMode: 'existing' as 'existing' | 'new',
+    newPropertyName: '',
+    newPropertyFunding: '',
+    newPropertyPriority: 'Medium' as Priority,
     scopeNotes: '',
     templateType: 'default' as TaskTemplate,
   });
@@ -133,7 +133,7 @@ export function ProjectOverviewPageRefactored() {
         setProjects(data);
         if (data[0]) {
           setSelectedProjectId((prev) => prev || data[0].id);
-          setExpandedClients(new Set([data[0].clientName]));
+          setExpandedClients(new Set([data[0].client_name]));
         }
       } catch (error) {
         toast.error('Unable to load projects');
@@ -154,7 +154,7 @@ export function ProjectOverviewPageRefactored() {
         clientName: lead.contactName,
         clientEmail: lead.email,
         clientPhone: lead.phone,
-        campusId: lead.campusId || prev.campusId,
+        propertyId: lead.propertyId || prev.propertyId,
       }));
     }
   }, [form.leadId]);
@@ -229,18 +229,18 @@ export function ProjectOverviewPageRefactored() {
     return projects.filter((project) => {
       const matchesSearch =
         project.name.toLowerCase().includes(search.toLowerCase()) ||
-        project.clientName.toLowerCase().includes(search.toLowerCase());
-      const matchesCampus = !campusFilter || project.campusId === campusFilter;
-      return matchesSearch && matchesCampus;
+        project.client_name.toLowerCase().includes(search.toLowerCase());
+      const matchesProperty = !propertyFilter || project.property_id === propertyFilter;
+      return matchesSearch && matchesProperty;
     });
-  }, [projects, search, campusFilter]);
+  }, [projects, search, propertyFilter]);
 
   // Group by client
   const groupedByClient = useMemo(() => {
     const map: Record<string, Project[]> = {};
     projectsToShow.forEach((project) => {
-      map[project.clientName] = map[project.clientName] || [];
-      map[project.clientName].push(project);
+      map[project.client_name] = map[project.client_name] || [];
+      map[project.client_name].push(project);
     });
     return Object.entries(map);
   }, [projectsToShow]);
@@ -254,11 +254,11 @@ export function ProjectOverviewPageRefactored() {
   // Get projects for selected client
   const selectedClientProjects = useMemo(() => {
     if (!selectedProject) return [] as Project[];
-    return projects.filter((project) => project.clientName === selectedProject.clientName);
+    return projects.filter((project) => project.client_name === selectedProject.client_name);
   }, [projects, selectedProject]);
 
   // Get unique client names
-  const clientOptions = useMemo(() => Array.from(new Set(projects.map((project) => project.clientName))).sort(), [projects]);
+  const clientOptions = useMemo(() => Array.from(new Set(projects.map((project) => project.client_name))).sort(), [projects]);
 
   // Update selected project when projects change
   useEffect(() => {
@@ -268,7 +268,7 @@ export function ProjectOverviewPageRefactored() {
     if (selectedProject) {
       setExpandedClients((prev) => {
         const next = new Set(prev);
-        next.add(selectedProject.clientName);
+        next.add(selectedProject.client_name);
         return next;
       });
     }
@@ -424,27 +424,27 @@ export function ProjectOverviewPageRefactored() {
   const handleCreateProject = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      let campusId = form.campusId;
-      if (form.campusMode === 'new') {
-        if (!form.newCampusName.trim()) {
-          toast.error('Enter a campus name');
+      let propertyId = form.propertyId;
+      if (form.propertyMode === 'new') {
+        if (!form.newPropertyName.trim()) {
+          toast.error('Enter a property name');
           return;
         }
-        const newCampusId = `campus-${form.newCampusName.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now().toString(36)}`;
-        mockCampuses.push({
-          id: newCampusId,
-          name: form.newCampusName.trim(),
-          fundingSource: form.newCampusFunding.trim() || 'Client Provided',
-          priority: form.newCampusPriority,
+        const newPropertyId = `property-${form.newPropertyName.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now().toString(36)}`;
+        mockProperties.push({
+          id: newPropertyId,
+          name: form.newPropertyName.trim(),
+          fundingSource: form.newPropertyFunding.trim() || 'Client Provided',
+          priority: form.newPropertyPriority,
         });
-        campusId = newCampusId;
+        propertyId = newPropertyId;
       }
-      let siteId = mockSites.find((site) => site.campusId === campusId)?.id;
+      let siteId = mockSites.find((site) => site.propertyId === propertyId)?.id;
       if (!siteId) {
         const newSiteId = `site-${Date.now().toString(36)}`;
         mockSites.push({
           id: newSiteId,
-          campusId,
+          propertyId,
           name: form.locationNotes || `${form.name} Site`,
           address: form.locationNotes || 'Address TBD',
           isHistoric: false,
@@ -470,7 +470,7 @@ export function ProjectOverviewPageRefactored() {
       const walkthroughPrepTasks = walkthroughTasks.length > 0 ? walkthroughTasks : [];
       const payload = {
         name: form.name,
-        campusId,
+        propertyId,
         siteId,
         clientName: finalClientName || mockLeads.find((l) => l.id === form.leadId)?.companyName || '',
         clientEmail: finalClientEmail,
@@ -515,7 +515,7 @@ export function ProjectOverviewPageRefactored() {
       setShowModal(false);
       setForm({
         name: '',
-        campusId: mockCampuses[0]?.id || '',
+        propertyId: mockProperties[0]?.id || '',
         locationNotes: '',
         clientName: '',
         clientEmail: '',
@@ -527,10 +527,10 @@ export function ProjectOverviewPageRefactored() {
         contactId: '',
         clientMode: 'existing',
         existingClient: '',
-        campusMode: 'existing',
-        newCampusName: '',
-        newCampusFunding: '',
-        newCampusPriority: 'Medium',
+        propertyMode: 'existing',
+        newPropertyName: '',
+        newPropertyFunding: '',
+        newPropertyPriority: 'Medium',
         scopeNotes: '',
         templateType: 'default',
       });
@@ -545,7 +545,7 @@ export function ProjectOverviewPageRefactored() {
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#143352]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#0f2749]" />
       </div>
     );
   }
@@ -565,8 +565,8 @@ export function ProjectOverviewPageRefactored() {
         <ProjectFiltersBar
           search={search}
           onSearchChange={setSearch}
-          campusFilter={campusFilter}
-          onCampusFilterChange={setCampusFilter}
+          propertyFilter={propertyFilter}
+          onPropertyFilterChange={setPropertyFilter}
           onNewProjectClick={() => setShowModal(true)}
         />
 

@@ -1,281 +1,296 @@
 import { useEffect, useMemo, useState } from 'react';
 import { contactService } from '../services/contactService';
-import {
-  mockLeads,
-  mockLeadIntakeRecords,
-  mockWalkthroughSessions,
-  type Contact,
-} from '../data/pipeline';
-import { Plus, Search, Filter, Phone, Mail, ExternalLink, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useContactPortalData } from '../hooks/useContactPortalData';
-import { useProfileData } from '../hooks/useProfileData';
+import { mockLeads } from '../data/pipeline';
+import type { Contact } from '../types';
+import { Plus, Search, Filter } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useProfileData } from '../hooks/useProfileData';
+import { formatDistanceToNow } from 'date-fns';
+
+const STATUS_BADGES: Record<'Lead' | 'Active', string> = {
+  Lead: 'bg-sky-50 text-sky-700 border border-sky-200',
+  Active: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+};
+
+type CommunicationPrefs = {
+  quoteFollowUps: boolean;
+  invoiceFollowUps: boolean;
+  visitReminders: boolean;
+  jobClosureFollowUps: boolean;
+};
+
+type ClientFormState = {
+  title: string;
+  firstName: string;
+  lastName: string;
+  company: string;
+  phone: string;
+  email: string;
+  leadSource: string;
+  propertyId: string;
+  address: {
+    street1: string;
+    street2: string;
+    city: string;
+    state: string;
+    zip: string;
+    country: string;
+  };
+  billingSameAsProperty: boolean;
+  communicationPreferences: CommunicationPrefs;
+};
+
+const DEFAULT_PREFS: CommunicationPrefs = {
+  quoteFollowUps: true,
+  invoiceFollowUps: true,
+  visitReminders: true,
+  jobClosureFollowUps: true,
+};
+
+const buildInitialForm = (propertyId: string): ClientFormState => ({
+  title: 'No title',
+  firstName: '',
+  lastName: '',
+  company: '',
+  phone: '',
+  email: '',
+  leadSource: '',
+  propertyId,
+  address: {
+    street1: '',
+    street2: '',
+    city: '',
+    state: '',
+    zip: '',
+    country: 'United States',
+  },
+  billingSameAsProperty: true,
+  communicationPreferences: { ...DEFAULT_PREFS },
+});
 
 export function ContactsPage() {
-  const { isAdminProfile, campuses } = useProfileData();
+  const { properties } = useProfileData();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<Contact['type'] | ''>('');
-  const [campusFilter, setCampusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'lead' | 'active'>('all');
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState({
-    name: '',
-    title: '',
-    email: '',
-    phone: '',
-    type: 'Client' as Contact['type'],
-    campusId: campuses[0]?.id || '',
-  });
-  const [portalAccess, setPortalAccess] = useState<Record<string, boolean>>({});
-  const [selectedPortalContact, setSelectedPortalContact] = useState<Contact | null>(null);
+  const [showFormModal, setShowFormModal] = useState(false);
+  const [showCommunicationSettings, setShowCommunicationSettings] = useState(false);
+  const [form, setForm] = useState<ClientFormState>(() => buildInitialForm(properties[0]?.id || ''));
 
   useEffect(() => {
     async function load() {
       try {
         setLoading(true);
-        // Admin profile: always empty, no mock data
-        if (isAdminProfile) {
-          setContacts([]);
-          return;
-        }
         const data = await contactService.list();
         setContacts(data);
       } catch (error) {
-        toast.error('Failed to load contacts');
+        toast.error('Failed to load clients');
       } finally {
         setLoading(false);
       }
     }
     load();
-  }, [isAdminProfile]);
+  }, []);
 
   useEffect(() => {
-    const map: Record<string, boolean> = {};
-    contacts.forEach((contact) => {
-      map[contact.id] = contact.clientPortalEnabled ?? false;
-    });
-    setPortalAccess(map);
-  }, [contacts]);
+    setForm((prev) => ({ ...prev, propertyId: prev.propertyId || properties[0]?.id || '' }));
+  }, [properties]);
+
+  const clients = useMemo(() => contacts.filter((contact) => contact.type === 'Client'), [contacts]);
+  const propertyMap = useMemo(() => {
+    const map = new Map<string, { name: string; address?: string }>();
+    properties.forEach((property) => map.set(property.id, property));
+    return map;
+  }, [properties]);
+
+  const thirtyDaysAgo = useMemo(() => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000), []);
+  const startOfYear = useMemo(() => new Date(new Date().getFullYear(), 0, 1), []);
+
+  const stats = useMemo(() => {
+    const newLeads = mockLeads.filter((lead: any) => new Date(lead.createdAt) >= thirtyDaysAgo).length;
+    const newClients = clients.filter((client) => new Date(client.created_at) >= thirtyDaysAgo).length;
+    const totalNewClients = clients.filter((client) => new Date(client.created_at) >= startOfYear).length;
+    return [
+      { label: 'New leads (30 days)', value: newLeads, trend: '+100%' },
+      { label: 'New clients (30 days)', value: newClients, trend: '+100%' },
+      { label: 'Total new clients (YTD)', value: totalNewClients, trend: '+100%' },
+    ];
+  }, [clients, thirtyDaysAgo, startOfYear]);
 
   const filtered = useMemo(() => {
-    return contacts.filter((contact) => {
+    return clients.filter((contact) => {
       const matchesSearch =
         contact.name.toLowerCase().includes(search.toLowerCase()) ||
         contact.company.toLowerCase().includes(search.toLowerCase());
-      const matchesType = !typeFilter || contact.type === typeFilter;
-      const matchesCampus = !campusFilter || contact.campusId === campusFilter;
-      return matchesSearch && matchesType && matchesCampus;
+      const status = getClientStatus(contact);
+      const matchesStatus =
+        statusFilter === 'all' ||
+        (statusFilter === 'lead' && status === 'Lead') ||
+        (statusFilter === 'active' && status === 'Active');
+      return matchesSearch && matchesStatus;
     });
-  }, [contacts, search, typeFilter, campusFilter]);
+  }, [clients, search, statusFilter]);
 
-  const handleCreate = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const resetForm = () => setForm(buildInitialForm(properties[0]?.id || ''));
+
+  const handleCreate = async (
+    event: React.FormEvent<HTMLFormElement>,
+    options?: { keepOpen?: boolean }
+  ) => {
+    event.preventDefault();
     try {
+      const fullName = `${form.firstName} ${form.lastName}`.trim() || form.company || 'New Client';
       const contact = await contactService.create({
-        ...form,
-        company: 'Pelican State',
-        projectIds: [],
-        leadIds: [],
-        preferredChannel: 'Email',
-        notes: 'Added via contacts page',
+        name: fullName,
+        title: form.title,
+        email: form.email,
+        phone: form.phone,
+        type: 'Client',
+        property_id: form.propertyId,
+        company: form.company || fullName,
+        preferred_channel: 'Email',
+        notes: `Lead source: ${form.leadSource || 'N/A'} | Address: ${[
+          form.address.street1,
+          form.address.city,
+          form.address.state,
+          form.address.zip,
+        ]
+          .filter(Boolean)
+          .join(', ')} | Billing same as property: ${form.billingSameAsProperty ? 'Yes' : 'No'}`,
       });
       setContacts((prev) => [...prev, contact]);
-      setForm({ name: '', title: '', email: '', phone: '', type: 'Client', campusId: campuses[0]?.id || '' });
-      toast.success('Contact added');
+      if (options?.keepOpen) {
+        resetForm();
+      } else {
+        setShowFormModal(false);
+        resetForm();
+      }
+      toast.success('Client added');
     } catch (error) {
-      toast.error('Failed to add contact');
+      toast.error('Failed to add client');
     }
   };
-
-  const handleTogglePortalAccess = async (contactId: string, enabled: boolean) => {
-    setPortalAccess((prev) => ({ ...prev, [contactId]: enabled }));
-    setContacts((prev) => prev.map((contact) => (contact.id === contactId ? { ...contact, clientPortalEnabled: enabled } : contact)));
-    if (!enabled && selectedPortalContact?.id === contactId) {
-      setSelectedPortalContact(null);
-    }
-    try {
-      await contactService.update(contactId, { clientPortalEnabled: enabled });
-      toast.success(enabled ? 'Client portal access enabled' : 'Client portal access disabled');
-    } catch (error) {
-      toast.error('Failed to update portal access');
-    }
-  };
-
-  const handleOpenPortalPreview = (contact: Contact) => {
-    setSelectedPortalContact(contact);
-  };
-
-  const handleClosePortalPreview = () => setSelectedPortalContact(null);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[50vh]">
-        <div className="w-10 h-10 border-4 border-[#143352]/20 border-t-[#143352] rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-[var(--brand-primary)]/20 border-t-[var(--brand-primary)] rounded-full animate-spin" />
       </div>
     );
   }
 
   return (
-    <>
-      <div className="space-y-6">
-        <header className="flex flex-wrap items-center justify-between gap-4">
+    <div className="space-y-8">
+      <header className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Network</p>
-          <h1 className="text-3xl font-heading font-bold text-neutral-900">Contacts</h1>
+          <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Clients</p>
+          <h1 className="text-3xl font-heading font-semibold text-[var(--text-body)]">Clients</h1>
         </div>
-        <button
-          onClick={() => document.getElementById('contact-form')?.scrollIntoView({ behavior: 'smooth' })}
-          className="inline-flex items-center gap-2 bg-[#143352] text-white px-4 py-2.5 text-sm font-medium"
-        >
-          <Plus className="w-4 h-4" /> Add Contact
+        <button onClick={() => setShowFormModal(true)} className="btn-primary px-6 py-2 text-sm">
+          <Plus className="w-4 h-4" /> New Client
         </button>
       </header>
 
-      <section className="bg-white border border-neutral-200 p-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-2 text-neutral-600 text-sm">
-          <Filter className="w-4 h-4" /> Search and filter your stakeholders
-        </div>
-        <div className="flex flex-col gap-3 w-full lg:w-auto lg:flex-row">
-          <div className="relative w-full lg:w-64">
-            <Search className="absolute left-3 top-3 w-4 h-4 text-neutral-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search contacts"
-              className="w-full pl-10 pr-4 py-2 border border-neutral-300 focus:outline-none focus:ring-2 focus:ring-[#143352]"
-            />
+      <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        {stats.map((card) => (
+          <div key={card.label} className="bg-white border border-[var(--border-subtle)] rounded-3xl p-4">
+            <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">{card.label}</p>
+            <div className="flex items-baseline gap-3 mt-2">
+              <p className="text-3xl font-heading text-[var(--text-body)]">{card.value}</p>
+              <span className="text-xs text-emerald-600 font-semibold">{card.trend}</span>
+            </div>
           </div>
-          <select value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as Contact['type'] | '')} className="px-3 py-2 border border-neutral-300">
-            <option value="">All Types</option>
-            {['Client', 'Internal', 'Vendor', 'Partner'].map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-          <select value={campusFilter} onChange={(e) => setCampusFilter(e.target.value)} className="px-3 py-2 border border-neutral-300">
-            <option value="">All Campuses</option>
-            {campuses.map((campus) => (
-              <option key={campus.id} value={campus.id}>
-                {campus.name}
-              </option>
-            ))}
-          </select>
+        ))}
+        <div className="bg-white border border-[var(--border-subtle)] rounded-3xl p-4 flex flex-col justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Integrations</p>
+            <h3 className="text-lg font-heading text-[var(--text-body)] mt-1">Sync clients with QuickBooks Online</h3>
+            <p className="text-sm text-[var(--text-muted)] mt-2">Eliminate double entry by keeping your CRM and accounting data aligned.</p>
+          </div>
+          <button className="btn-secondary mt-4 w-max px-4 py-2 text-sm">Sync now</button>
         </div>
       </section>
 
-      <section className="bg-white border border-neutral-200">
+      <section className="bg-white border border-[var(--border-subtle)] rounded-3xl p-4 space-y-4">
+        <div className="flex flex-wrap items-center gap-2 text-sm text-[var(--text-muted)]">
+          <button className="btn-secondary inline-flex items-center gap-2 px-4 py-2 text-sm">
+            <Filter className="w-4 h-4" /> Filter by tag
+          </button>
+          {[
+            { label: 'Status', value: 'all' },
+            { label: 'Leads', value: 'lead' },
+            { label: 'Active', value: 'active' },
+          ].map((chip) => (
+            <button
+              key={chip.value}
+              onClick={() => setStatusFilter(chip.value as 'all' | 'lead' | 'active')}
+              className={`px-4 py-2 border text-sm ${
+                statusFilter === chip.value
+                  ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]'
+                  : 'text-[var(--text-muted)] border-[var(--border-subtle)]'
+              }`}
+            >
+              {chip.label}
+            </button>
+          ))}
+          <div className="relative ml-auto w-full max-w-xs">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-muted)]" />
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search clients"
+              className="w-full pl-11 pr-4 py-2 border rounded-full"
+            />
+          </div>
+        </div>
+        <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Filtered clients ({filtered.length} results)</p>
+      </section>
+
+      <section className="bg-white border border-[var(--border-subtle)] rounded-3xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full text-sm">
-            <thead className="bg-neutral-50 text-xs uppercase tracking-wide text-neutral-500">
+            <thead className="bg-[var(--brand-sand)] text-xs uppercase text-[var(--text-muted)]">
               <tr>
-                <th className="text-left py-3 px-4">Name</th>
-                <th className="text-left py-3 px-4">Company</th>
-                <th className="text-left py-3 px-4">Type</th>
-                <th className="text-left py-3 px-4">Campus</th>
-                <th className="text-left py-3 px-4">Email</th>
-                <th className="text-left py-3 px-4">Phone</th>
-                <th className="text-left py-3 px-4">Portal</th>
-                <th className="text-left py-3 px-4">Intakes</th>
-                <th className="text-left py-3 px-4">Walkthroughs</th>
+                <th className="text-left px-6 py-3">Name</th>
+                <th className="text-left px-6 py-3">Address</th>
+                <th className="text-left px-6 py-3">Tags</th>
+                <th className="text-left px-6 py-3">Status</th>
+                <th className="text-left px-6 py-3">Last activity</th>
               </tr>
             </thead>
             <tbody>
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={9} className="text-center py-8 text-neutral-500">No contacts found.</td>
+                  <td colSpan={5} className="px-6 py-12 text-center text-[var(--text-muted)]">
+                    No clients found with the current filters.
+                  </td>
                 </tr>
               ) : (
                 filtered.map((contact) => {
-                  const associatedLeads = mockLeads.filter((lead) => contact.leadIds.includes(lead.id));
-                  const intakeHistory = mockLeadIntakeRecords
-                    .filter((record) => associatedLeads.some((lead) => lead.id === record.leadId))
-                    .sort((a, b) => new Date(b.capturedAt).valueOf() - new Date(a.capturedAt).valueOf());
-                  const walkthroughHistory = mockWalkthroughSessions
-                    .filter((session) => contact.leadIds.includes(session.leadId))
-                    .sort((a, b) => new Date(b.scheduledDate).valueOf() - new Date(a.scheduledDate).valueOf());
-                  const latestIntake = intakeHistory[0];
-                  const latestWalkthrough = walkthroughHistory[0];
-                  const portalEnabled = portalAccess[contact.id] ?? false;
-                  const portalPath = portalEnabled ? getPortalPath(contact) : null;
+                  const property = contact.property_id ? propertyMap.get(contact.property_id) : undefined;
+                  const status = getClientStatus(contact);
+                  const tags = contact.project_ids.length > 1
+                    ? `${contact.project_ids.length} properties`
+                    : property?.name || 'Single property';
                   return (
-                    <tr key={contact.id} className="border-t border-neutral-100">
-                      <td className="py-2 px-4">
-                        <p className="font-semibold text-neutral-900">{contact.name}</p>
-                        <p className="text-xs text-neutral-500">{contact.title}</p>
+                    <tr key={contact.id} className="border-t border-[var(--border-subtle)] hover:bg-[var(--brand-sand)]/70">
+                      <td className="px-6 py-4">
+                        <p className="font-semibold text-[var(--text-body)]">{contact.name}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{contact.company}</p>
                       </td>
-                      <td className="py-2 px-4 text-neutral-700">{contact.company}</td>
-                      <td className="py-2 px-4 text-neutral-700">{contact.type}</td>
-                      <td className="py-2 px-4 text-neutral-700">{campuses.find((c) => c.id === contact.campusId)?.name || 'Multiple'}</td>
-                      <td className="py-2 px-4">
-                        <div className="flex items-center gap-2 text-neutral-700">
-                          <Mail className="w-4 h-4 text-neutral-400" />
-                          <span className="truncate">{contact.email}</span>
-                        </div>
+                      <td className="px-6 py-4 text-[var(--text-muted)]">{property?.address || tags}</td>
+                      <td className="px-6 py-4 text-[var(--text-muted)]">
+                        <span className="inline-flex items-center px-3 py-1 border border-[var(--border-subtle)] rounded-full text-xs">
+                          {tags}
+                        </span>
                       </td>
-                      <td className="py-2 px-4">
-                        <div className="flex items-center gap-2 text-neutral-700">
-                          <Phone className="w-4 h-4 text-neutral-400" />
-                          <span>{contact.phone}</span>
-                        </div>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-3 py-1 text-xs font-medium rounded-full ${STATUS_BADGES[status]}`}>
+                          {status}
+                        </span>
                       </td>
-                      <td className="py-2 px-4">
-                        {contact.type !== 'Client' ? (
-                          <span className="inline-flex items-center gap-2 text-xs text-neutral-400 border border-neutral-200 px-2.5 py-1 rounded-full" title="Portal access reserved for client contacts">
-                            <ExternalLink className="w-3 h-3" /> Portal NA
-                          </span>
-                        ) : portalEnabled && portalPath ? (
-                          <div className="flex flex-col gap-1">
-                            <button
-                              onClick={() => handleOpenPortalPreview(contact)}
-                              className="inline-flex items-center justify-center gap-2 text-xs font-semibold text-white bg-[#143352] px-3 py-1.5 rounded-full"
-                            >
-                              Preview Portal
-                            </button>
-                            <Link
-                              to={portalPath}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-2 text-xs font-semibold text-[#143352] border border-[#143352]/30 px-2.5 py-1.5 rounded-full hover:bg-[#143352]/5"
-                            >
-                              <ExternalLink className="w-3 h-3" /> Open Full Portal
-                            </Link>
-                            <button
-                              onClick={() => handleTogglePortalAccess(contact.id, false)}
-                              className="text-[11px] text-neutral-500 underline"
-                            >
-                              Disable access
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            onClick={() => handleTogglePortalAccess(contact.id, true)}
-                            className="inline-flex items-center gap-2 text-xs font-semibold text-[#143352] border border-dashed border-[#143352]/50 px-2.5 py-1.5 rounded-full hover:bg-[#143352]/5"
-                          >
-                            Enable Portal
-                          </button>
-                        )}
-                      </td>
-                      <td className="py-2 px-4 text-neutral-700">
-                        {intakeHistory.length}
-                        {latestIntake && (
-                          <p className="text-xs text-neutral-500">
-                            {new Date(latestIntake.capturedAt).toLocaleDateString()} · {latestIntake.formSnapshot.intakeChannel}
-                          </p>
-                        )}
-                      </td>
-                      <td className="py-2 px-4 text-neutral-700">
-                        {walkthroughHistory.length}
-                        {latestWalkthrough && (
-                          <p className="text-xs text-neutral-500 flex items-center gap-2">
-                            {new Date(latestWalkthrough.scheduledDate).toLocaleDateString()}
-                            <Link to={`/walkthroughs/new/${latestWalkthrough.leadId}`} className="text-[#143352]">
-                              View
-                            </Link>
-                          </p>
-                        )}
-                      </td>
+                      <td className="px-6 py-4 text-[var(--text-muted)]">{formatLastActivity(contact.updated_at)}</td>
                     </tr>
                   );
                 })
@@ -285,156 +300,185 @@ export function ContactsPage() {
         </div>
       </section>
 
-      <section id="contact-form" className="bg-white border border-neutral-200 p-6 space-y-4">
-        <h2 className="text-lg font-heading font-semibold text-neutral-900">Create Contact</h2>
-        <form className="grid grid-cols-1 md:grid-cols-3 gap-4" onSubmit={handleCreate}>
-          <input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Name" className="border border-neutral-300 px-3 py-2" />
-          <input required value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} placeholder="Title" className="border border-neutral-300 px-3 py-2" />
-          <input required value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Email" className="border border-neutral-300 px-3 py-2" />
-          <input required value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone" className="border border-neutral-300 px-3 py-2" />
-          <select value={form.type} onChange={(e) => setForm({ ...form, type: e.target.value as Contact['type'] })} className="border border-neutral-300 px-3 py-2">
-            {['Client', 'Internal', 'Vendor', 'Partner'].map((type) => (
-              <option key={type} value={type}>
-                {type}
-              </option>
-            ))}
-          </select>
-          <select value={form.campusId} onChange={(e) => setForm({ ...form, campusId: e.target.value })} className="border border-neutral-300 px-3 py-2">
-            {campuses.map((campus) => (
-              <option key={campus.id} value={campus.id}>
-                {campus.name}
-              </option>
-            ))}
-          </select>
-          <button type="submit" className="bg-[#143352] text-white px-4 py-2 font-medium flex items-center justify-center gap-2">
-            <Plus className="w-4 h-4" /> Save Contact
-          </button>
-        </form>
-      </section>
-      </div>
-      {selectedPortalContact && (
-        <ContactPortalDrawer
-          contact={selectedPortalContact}
-          portalPath={getPortalPath(selectedPortalContact) ?? '/client-portal'}
-          onClose={handleClosePortalPreview}
-          onDisable={() => handleTogglePortalAccess(selectedPortalContact.id, false)}
+      {showFormModal && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+          <div className="bg-white w-full max-w-4xl rounded-3xl border border-[var(--border-subtle)] shadow-2xl p-6 space-y-6 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">New client</p>
+                <h2 className="text-2xl font-heading font-semibold text-[var(--text-body)]">Primary contact details</h2>
+                <p className="text-sm text-[var(--text-muted)]">Provide the main point of contact for smooth communication.</p>
+              </div>
+              <button onClick={() => setShowFormModal(false)} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+            </div>
+            <form className="space-y-6" onSubmit={(e) => handleCreate(e)}>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <select value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} className="border rounded-2xl px-3 py-2">
+                  {['No title', 'Ms.', 'Mr.', 'Mx.', 'Dr.'].map((title) => (
+                    <option key={title} value={title}>
+                      {title}
+                    </option>
+                  ))}
+                </select>
+                <input value={form.firstName} onChange={(e) => setForm({ ...form, firstName: e.target.value })} placeholder="First name" className="border rounded-2xl px-3 py-2" />
+                <input value={form.lastName} onChange={(e) => setForm({ ...form, lastName: e.target.value })} placeholder="Last name" className="border rounded-2xl px-3 py-2" />
+                <input value={form.company} onChange={(e) => setForm({ ...form, company: e.target.value })} placeholder="Company name" className="border rounded-2xl px-3 py-2" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <input value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} placeholder="Phone number" className="border rounded-2xl px-3 py-2" />
+                <input value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} placeholder="Email" className="border rounded-2xl px-3 py-2" />
+              </div>
+              <button type="button" onClick={() => setShowCommunicationSettings(true)} className="text-sm text-[var(--brand-primary)] underline">
+                Communication settings
+              </button>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <input value={form.leadSource} onChange={(e) => setForm({ ...form, leadSource: e.target.value })} placeholder="Lead source" className="border rounded-2xl px-3 py-2" />
+                <select value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} className="border rounded-2xl px-3 py-2">
+                  {properties.map((property) => (
+                    <option key={property.id} value={property.id}>
+                      {property.name}
+                    </option>
+                  ))}
+                </select>
+                <input placeholder="Additional contacts (optional)" className="border rounded-2xl px-3 py-2" />
+              </div>
+
+              <section className="space-y-4">
+                <div>
+                  <h3 className="text-lg font-heading font-semibold text-[var(--text-body)]">Property address</h3>
+                  <p className="text-sm text-[var(--text-muted)]">Enter the service or billing address for this client.</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <input value={form.address.street1} onChange={(e) => setForm({ ...form, address: { ...form.address, street1: e.target.value } })} placeholder="Street 1" className="border rounded-2xl px-3 py-2" />
+                  <input value={form.address.street2} onChange={(e) => setForm({ ...form, address: { ...form.address, street2: e.target.value } })} placeholder="Street 2" className="border rounded-2xl px-3 py-2" />
+                  <input value={form.address.city} onChange={(e) => setForm({ ...form, address: { ...form.address, city: e.target.value } })} placeholder="City" className="border rounded-2xl px-3 py-2" />
+                  <input value={form.address.state} onChange={(e) => setForm({ ...form, address: { ...form.address, state: e.target.value } })} placeholder="State" className="border rounded-2xl px-3 py-2" />
+                  <input value={form.address.zip} onChange={(e) => setForm({ ...form, address: { ...form.address, zip: e.target.value } })} placeholder="ZIP code" className="border rounded-2xl px-3 py-2" />
+                  <select value={form.address.country} onChange={(e) => setForm({ ...form, address: { ...form.address, country: e.target.value } })} className="border rounded-2xl px-3 py-2">
+                    {['United States', 'Canada', 'Other'].map((country) => (
+                      <option key={country} value={country}>
+                        {country}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <label className="flex items-center gap-2 text-sm text-[var(--text-body)]">
+                  <input
+                    type="checkbox"
+                    checked={form.billingSameAsProperty}
+                    onChange={(e) => setForm({ ...form, billingSameAsProperty: e.target.checked })}
+                  />
+                  Billing address is the same as property address
+                </label>
+              </section>
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <button type="button" onClick={() => setShowFormModal(false)} className="btn-secondary px-5 py-2 text-sm">
+                  Cancel
+                </button>
+                <div className="flex gap-3">
+                  <button
+                    type="button"
+                    onClick={(e) => handleCreate(e as unknown as React.FormEvent<HTMLFormElement>, { keepOpen: true })}
+                    className="btn-secondary px-5 py-2 text-sm"
+                  >
+                    Save and create another
+                  </button>
+                  <button type="submit" className="btn-primary px-5 py-2 text-sm">
+                    Save client
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showCommunicationSettings && (
+        <CommunicationSettingsModal
+          preferences={form.communicationPreferences}
+          onClose={() => setShowCommunicationSettings(false)}
+          onSave={(prefs) => {
+            setForm((prev) => ({ ...prev, communicationPreferences: prefs }));
+            setShowCommunicationSettings(false);
+          }}
         />
       )}
-    </>
-  );
-}
-
-function ContactPortalDrawer({ contact, portalPath, onClose, onDisable }: { contact: Contact; portalPath: string; onClose: () => void; onDisable: () => void }) {
-  const portalData = useContactPortalData(contact.id);
-  const { projects, workOrders, openWorkOrders, totalBudget, spentBudget } = portalData;
-  const summaryCards = [
-    { label: 'Active Projects', value: projects.length.toString() },
-    { label: 'Open Work Orders', value: openWorkOrders.length.toString() },
-    { label: 'Budget Remaining', value: formatCurrency(Math.max(totalBudget - spentBudget, 0)) },
-  ];
-
-  return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-start justify-end">
-      <div className="bg-white w-full max-w-5xl h-full overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-white border-b border-neutral-200 px-6 py-4 flex items-center justify-between">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-neutral-400">Client Portal Preview</p>
-            <h2 className="text-2xl font-heading font-semibold text-neutral-900">{contact.name}</h2>
-            <p className="text-sm text-neutral-600">{contact.company} • {contact.email}</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Link
-              to={portalPath}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 px-4 py-2 text-sm border border-neutral-300 rounded-full text-neutral-700"
-            >
-              <ExternalLink className="w-4 h-4" /> Open Portal
-            </Link>
-            <button onClick={onDisable} className="text-xs text-neutral-500 underline">Disable Access</button>
-            <button onClick={onClose} className="w-9 h-9 rounded-full border border-neutral-200 flex items-center justify-center text-neutral-600">
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-
-        <div className="px-6 py-6 space-y-6 bg-neutral-50">
-            <div className="grid gap-4 md:grid-cols-3">
-              {summaryCards.map((card) => (
-                <div key={card.label} className="bg-white border border-neutral-200 p-4 rounded-2xl">
-                  <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">{card.label}</p>
-                  <p className="text-2xl font-heading font-semibold text-neutral-900">{card.value}</p>
-                </div>
-              ))}
-            </div>
-            {portalData.viewingMessage && (
-              <div className="bg-white border border-neutral-200 p-4 rounded-2xl text-xs text-neutral-600">
-                {portalData.viewingMessage}
-              </div>
-            )}
-          <section className="bg-white border border-neutral-200 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-heading font-semibold text-neutral-900">Projects ({projects.length})</h3>
-                <p className="text-xs text-neutral-500">Aggregated view limited to this contact’s work</p>
-              </div>
-            </div>
-            {projects.length === 0 ? (
-              <p className="text-sm text-neutral-500">No projects assigned yet.</p>
-            ) : (
-              <div className="grid gap-3 md:grid-cols-2">
-                {projects.map((project) => (
-                  <div key={project.id} className="border border-neutral-200 rounded-xl p-4 space-y-1">
-                    <div className="flex items-center justify-between">
-                      <p className="font-semibold text-neutral-900">{project.name}</p>
-                      <span className="text-xs text-neutral-500">{project.status}</span>
-                    </div>
-                    <p className="text-xs text-neutral-500">{project.clientSummary}</p>
-                    <p className="text-xs text-neutral-500">Budget {formatCurrency(project.spentBudget)} / {formatCurrency(project.totalBudget)}</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="bg-white border border-neutral-200 rounded-2xl p-5 space-y-3">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-heading font-semibold text-neutral-900">Work Orders ({workOrders.length})</h3>
-                <p className="text-xs text-neutral-500">Mirrors what the client sees inside the portal</p>
-              </div>
-            </div>
-            {workOrders.length === 0 ? (
-              <p className="text-sm text-neutral-500">No work orders have been published to this contact yet.</p>
-            ) : (
-              <div className="space-y-3">
-                {workOrders.slice(0, 5).map((order) => (
-                  <div key={order.id} className="border border-neutral-200 rounded-xl p-4">
-                    <div className="flex items-center justify-between text-sm">
-                      <p className="font-medium text-neutral-900">{order.title}</p>
-                      <span className="text-xs px-2 py-1 border border-neutral-200 rounded-full text-neutral-600">{order.status}</span>
-                    </div>
-                    <p className="text-xs text-neutral-500">{order.category} • {order.priority} priority</p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-        </div>
-      </div>
     </div>
   );
 }
 
-function getPortalPath(contact: Contact): string | null {
-  if (contact.type !== 'Client') return null;
-  const primaryProjectId = contact.projectIds?.[0];
-  if (primaryProjectId) {
-    return `/client-portal/projects/${primaryProjectId}?contactId=${contact.id}`;
-  }
-  return `/client-portal/projects?contactId=${contact.id}`;
+function getClientStatus(contact: Contact): 'Lead' | 'Active' {
+  return contact.project_ids.length > 0 ? 'Active' : 'Lead';
 }
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
+function formatLastActivity(date?: string) {
+  if (!date) return '—';
+  try {
+    return formatDistanceToNow(new Date(date), { addSuffix: true });
+  } catch {
+    return '—';
+  }
+}
+
+function CommunicationSettingsModal({
+  preferences,
+  onClose,
+  onSave,
+}: {
+  preferences: CommunicationPrefs;
+  onClose: () => void;
+  onSave: (prefs: CommunicationPrefs) => void;
+}) {
+  const [draft, setDraft] = useState(preferences);
+
+  const toggle = (key: keyof CommunicationPrefs) =>
+    setDraft((prev) => ({ ...prev, [key]: !prev[key] }));
+
+  const renderToggle = (label: string, key: keyof CommunicationPrefs) => (
+    <div className="flex items-center justify-between py-2">
+      <span className="text-sm text-[var(--text-body)]">{label}</span>
+      <button
+        type="button"
+        onClick={() => toggle(key)}
+        className={`w-12 h-6 rounded-full border flex items-center px-1 transition ${
+          draft[key]
+            ? 'bg-[var(--brand-primary)] border-[var(--brand-primary)] justify-end'
+            : 'bg-white border-[var(--border-subtle)] justify-start'
+        }`}
+      >
+        <span className="w-4 h-4 bg-white rounded-full shadow" />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
+      <div className="bg-white w-full max-w-lg rounded-3xl border border-[var(--border-subtle)] shadow-2xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-xl font-heading text-[var(--text-body)]">Communication settings</h3>
+            <p className="text-sm text-[var(--text-muted)]">Automated reminders and follow-ups for this client.</p>
+          </div>
+          <button onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+        </div>
+        <div className="space-y-4">
+          <div className="border border-[var(--border-subtle)] rounded-2xl p-4 space-y-2">
+            <p className="text-sm font-semibold text-[var(--text-body)]">Quotes & Invoices</p>
+            {renderToggle('Outstanding quote follow-ups', 'quoteFollowUps')}
+            {renderToggle('Overdue invoice follow-ups', 'invoiceFollowUps')}
+          </div>
+          <div className="border border-[var(--border-subtle)] rounded-2xl p-4 space-y-2">
+            <p className="text-sm font-semibold text-[var(--text-body)]">Jobs & Visits</p>
+            {renderToggle('Visit reminders', 'visitReminders')}
+            {renderToggle('Job closure follow-ups', 'jobClosureFollowUps')}
+          </div>
+        </div>
+        <div className="flex justify-end gap-3">
+          <button onClick={onClose} className="btn-secondary px-4 py-2 text-sm">Cancel</button>
+          <button onClick={() => onSave(draft)} className="btn-primary px-5 py-2 text-sm">Save</button>
+        </div>
+      </div>
+    </div>
+  );
 }

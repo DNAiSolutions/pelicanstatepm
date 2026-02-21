@@ -11,7 +11,7 @@ interface ProtectedRouteProps {
 }
 
 export function ProtectedRoute({ children, requiredRoles, requiresProfile = true, allowedAccess }: ProtectedRouteProps) {
-  const { isAuthenticated, loading, user, profileLoading, requiresOnboarding, accessType } = useAuth();
+  const { isAuthenticated, loading, user, profileLoading, requiresOnboarding, accessType, isDevelopmentProfile } = useAuth();
   const location = useLocation();
 
   // Show loading state
@@ -31,7 +31,7 @@ export function ProtectedRoute({ children, requiredRoles, requiresProfile = true
     return <Navigate to="/login" replace />;
   }
 
-  if (requiresProfile && !profileLoading) {
+  if (requiresProfile && !profileLoading && !isDevelopmentProfile) {
     if (requiresOnboarding) {
       if (location.pathname !== '/onboarding') {
         return <Navigate to="/onboarding" replace />;

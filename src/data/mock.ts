@@ -4,7 +4,7 @@ export const mockWorkRequests: WorkRequest[] = [
   {
     id: 'WR-2024-001',
     request_number: 'WR-2024-001',
-    campus_id: 'wallace-id',
+    property_id: 'wallace-id',
     property: 'Historic Building A',
     is_historic: true,
     category: 'Capital Improvement',
@@ -23,7 +23,7 @@ export const mockWorkRequests: WorkRequest[] = [
   {
     id: 'WR-2024-002',
     request_number: 'WR-2024-002',
-    campus_id: 'woodland-id',
+    property_id: 'woodland-id',
     property: 'Main Gallery',
     is_historic: true,
     category: 'Small Works',
@@ -40,7 +40,7 @@ export const mockWorkRequests: WorkRequest[] = [
   {
     id: 'WR-2024-003',
     request_number: 'WR-2024-003',
-    campus_id: 'wallace-id',
+    property_id: 'wallace-id',
     property: 'Pergola Area',
     is_historic: false,
     category: 'Event Support',
@@ -59,7 +59,7 @@ export const mockWorkRequests: WorkRequest[] = [
   {
     id: 'WR-2024-004',
     request_number: 'WR-2024-004',
-    campus_id: 'paris-id',
+    property_id: 'paris-id',
     property: 'Main Building',
     is_historic: false,
     category: 'Small Works',

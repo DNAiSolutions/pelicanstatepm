@@ -7,7 +7,7 @@ export type UserRole = 'Owner' | 'Developer' | 'User';
 
 export interface AuthUser extends User {
   role?: UserRole;
-  campusAssigned?: string[];
+  propertyAssigned?: string[];
 }
 
 export interface AuthContextType {
@@ -19,65 +19,27 @@ export interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signOut: () => Promise<void>;
   isAuthenticated: boolean;
-  switchProfile: (profile: 'demo' | 'admin' | 'dev') => void;
   profile: UserProfile | null;
   profileLoading: boolean;
   refreshProfile: () => Promise<void>;
   requiresOnboarding: boolean;
   accessType: AccessType;
-  isDemoAccount: boolean;
+  isDevelopmentProfile: boolean;
 }
 
-const DEMO_USER: AuthUser = {
-  id: 'demo-user-123',
-  aud: 'authenticated',
-  role: 'Owner',
-  campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
-  email: 'demo@pelicanstate.com',
-  email_confirmed_at: new Date().toISOString(),
-  phone: '',
-  confirmed_at: new Date().toISOString(),
-  last_sign_in_at: new Date().toISOString(),
-  app_metadata: { provider: 'demo' },
-  user_metadata: { demo: true },
-  identities: [],
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
-
-const ADMIN_USER: AuthUser = {
-  id: 'admin-user-789',
-  aud: 'authenticated',
-  role: 'Owner',
-  campusAssigned: [],
-  email: 'admin@pelicanstate.com',
-  email_confirmed_at: new Date().toISOString(),
-  phone: '',
-  confirmed_at: new Date().toISOString(),
-  last_sign_in_at: new Date().toISOString(),
-  app_metadata: { provider: 'admin' },
-  user_metadata: { admin: true },
-  identities: [],
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
-
-const DEV_USER: AuthUser = {
-  id: 'dev-user-999',
-  aud: 'authenticated',
-  role: 'Developer',
-  campusAssigned: ['Wallace', 'Woodland (Laplace)', 'Paris'],
-  email: 'dev@pelicanstate.com',
-  email_confirmed_at: new Date().toISOString(),
-  phone: '',
-  confirmed_at: new Date().toISOString(),
-  last_sign_in_at: new Date().toISOString(),
-  app_metadata: { provider: 'dev' },
-  user_metadata: { dev: true },
-  identities: [],
-  created_at: new Date().toISOString(),
-  updated_at: new Date().toISOString(),
-};
+const DEV_PROFILE_ID = 'dev-profile';
+const DEV_PROFILE_EMAIL = import.meta.env.VITE_DEV_PROFILE_EMAIL as string | undefined;
+const DEV_PROFILE_NAME = import.meta.env.VITE_DEV_PROFILE_NAME as string | undefined;
+const DEV_PROFILE_ROLE = (import.meta.env.VITE_DEV_PROFILE_ROLE as UserRole | undefined) ?? 'Developer';
+const DEV_PROFILE_CAMPUSES = (import.meta.env.VITE_DEV_PROFILE_CAMPUSES as string | undefined)
+  ?.split(',')
+  .map((value) => value.trim())
+  .filter(Boolean) ?? ['Wallace'];
+const DEV_PROFILE_ENABLED = import.meta.env.DEV && Boolean(DEV_PROFILE_EMAIL);
+const TRUSTED_ADMIN_EMAILS = ((import.meta.env.VITE_ADMIN_EMAILS as string) || 'support@dnai.solutions')
+  .split(',')
+  .map((value: string) => value.trim().toLowerCase())
+  .filter(Boolean);
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -87,15 +49,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [error, setError] = useState<string | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [devProfileActive, setDevProfileActive] = useState(false);
 
-  const isDemoEmail = (email?: string | null) =>
-    email === 'demo@pelicanstate.com' || email === 'admin@pelicanstate.com' || email === 'dev@pelicanstate.com';
+  const isTrustedAdminEmail = (email?: string | null) =>
+    Boolean(email && TRUSTED_ADMIN_EMAILS.includes(email.toLowerCase()));
 
-  const loadUserProfile = async (userId: string) => {
+  const loadUserProfile = async (userId: string, email?: string | null) => {
     setProfileLoading(true);
     try {
       const data = await userProfileService.getProfile(userId);
-      setProfile(data ?? null);
+      if (isTrustedAdminEmail(email)) {
+        if (!data || data.status !== 'approved' || data.access_granted !== 'staff') {
+          const adminProfile = await userProfileService.upsertProfile({
+            userId,
+            fullName: email ?? 'Pelican Admin',
+            roleTitle: 'Owner / Founder',
+            department: 'Operations',
+            teamSize: '1-5',
+            requestedAccess: 'staff',
+            status: 'approved',
+            accessGranted: 'staff',
+          });
+          setProfile(adminProfile);
+        } else {
+          setProfile(data);
+        }
+      } else {
+        setProfile(data ?? null);
+      }
     } catch (profileError) {
       console.warn('Failed to load profile', profileError);
       setProfile(null);
@@ -104,20 +85,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const applyDemoProfile = (key: 'demo' | 'admin' | 'dev') => {
-    let selectedUser = DEMO_USER;
-    if (key === 'admin') selectedUser = ADMIN_USER;
-    if (key === 'dev') selectedUser = DEV_USER;
-    setUser(selectedUser);
+  const applyDevelopmentProfile = () => {
+    if (!DEV_PROFILE_EMAIL) return;
+    const devUser: AuthUser = {
+      id: DEV_PROFILE_ID,
+      aud: 'authenticated',
+      email: DEV_PROFILE_EMAIL,
+      email_confirmed_at: new Date().toISOString(),
+      phone: '',
+      confirmed_at: new Date().toISOString(),
+      last_sign_in_at: new Date().toISOString(),
+      app_metadata: { provider: 'development' },
+      user_metadata: { developmentProfile: true },
+      identities: [],
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      role: DEV_PROFILE_ROLE,
+      propertyAssigned: DEV_PROFILE_CAMPUSES,
+    };
+    setUser(devUser);
     setProfile({
-      user_id: key,
-      full_name: key === 'admin' ? 'Admin' : 'Demo User',
-      role_title: key === 'admin' ? 'Admin' : 'Demo',
+      user_id: DEV_PROFILE_ID,
+      full_name: DEV_PROFILE_NAME ?? 'Development User',
+      role_title: DEV_PROFILE_ROLE,
       requested_access: 'staff',
       access_granted: 'staff',
       status: 'approved',
     } as UserProfile);
-    localStorage.setItem('auth-profile', key);
+    setDevProfileActive(true);
   };
 
   useEffect(() => {
@@ -130,9 +125,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUser({
             ...currentUser,
             role: 'Owner',
-            campusAssigned: currentUser.user_metadata?.campusAssigned ?? [],
+            propertyAssigned: currentUser.user_metadata?.propertyAssigned ?? [],
           });
-          await loadUserProfile(currentUser.id);
+          setDevProfileActive(false);
+          await loadUserProfile(currentUser.id, currentUser.email);
           setLoading(false);
           return;
         }
@@ -140,9 +136,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         console.warn('AuthProvider: Error getting current user:', initError);
       }
 
+      if (isMounted && DEV_PROFILE_ENABLED) {
+        applyDevelopmentProfile();
+        setLoading(false);
+        return;
+      }
+
       if (isMounted) {
-        const savedProfile = (localStorage.getItem('auth-profile') || 'demo') as 'demo' | 'admin' | 'dev';
-        applyDemoProfile(savedProfile);
         setLoading(false);
       }
     }
@@ -152,16 +152,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: authListener } = authService.onAuthStateChange((event, session) => {
       if (!isMounted) return;
       if (event === 'SIGNED_IN' && session?.user) {
-        setUser({
-          ...session.user,
-          role: 'Owner',
-          campusAssigned: session.user.user_metadata?.campusAssigned ?? [],
-        });
-        loadUserProfile(session.user.id);
-      }
+         setUser({
+           ...session.user,
+           role: 'Owner',
+           propertyAssigned: session.user.user_metadata?.propertyAssigned ?? [],
+         });
+         setDevProfileActive(false);
+         loadUserProfile(session.user.id, session.user.email);
+       }
       if (event === 'SIGNED_OUT') {
         setUser(null);
         setProfile(null);
+        setDevProfileActive(false);
       }
     });
 
@@ -171,23 +173,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  const isAuthenticated = user !== null;
-
   const signIn = async (email: string, password: string) => {
     try {
       setError(null);
       setLoading(true);
-      
+
       const { data, error: signInError } = await authService.signIn(email, password);
       if (signInError) throw signInError;
-      
+
       if (data?.user) {
         setUser({
           ...data.user,
           role: 'Owner',
-          campusAssigned: data.user.user_metadata?.campusAssigned ?? [],
+          propertyAssigned: data.user.user_metadata?.propertyAssigned ?? [],
         });
-        await loadUserProfile(data.user.id);
+        setDevProfileActive(false);
+        await loadUserProfile(data.user.id, data.user.email);
       } else {
         throw new Error('Failed to sign in');
       }
@@ -235,6 +236,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       await authService.signOut();
       setUser(null);
       setProfile(null);
+      setDevProfileActive(false);
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Sign out failed';
       setError(message);
@@ -242,19 +244,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const switchProfile = (target: 'demo' | 'admin' | 'dev') => {
-    applyDemoProfile(target);
-  };
-
   const refreshProfile = async () => {
-    if (user && !isDemoEmail(user.email)) {
-      await loadUserProfile(user.id);
+    if (user && !devProfileActive) {
+      await loadUserProfile(user.id, user.email);
     }
   };
 
-  const isDemoAccount = !!user && isDemoEmail(user.email);
-  const accessType: AccessType = isDemoAccount ? 'staff' : profile?.access_granted ?? 'vendor';
-  const requiresOnboarding = !!user && !isDemoAccount && !profileLoading && !profile;
+  const userIsTrustedAdmin = isTrustedAdminEmail(user?.email);
+  const accessType: AccessType = devProfileActive || userIsTrustedAdmin ? 'staff' : profile?.access_granted ?? 'vendor';
+  const requiresOnboarding = !!user && !devProfileActive && !profileLoading && !profile && !userIsTrustedAdmin;
+  const isAuthenticated = user !== null;
 
   const value: AuthContextType = {
     user,
@@ -265,13 +264,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     signInWithGoogle,
     signOut,
     isAuthenticated,
-    switchProfile,
     profile,
     profileLoading,
     refreshProfile,
     requiresOnboarding,
     accessType,
-    isDemoAccount,
+    isDevelopmentProfile: devProfileActive,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

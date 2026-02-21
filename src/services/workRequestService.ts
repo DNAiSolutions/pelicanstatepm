@@ -5,18 +5,19 @@ export const workRequestService = {
   // Get all work requests (with filters)
   async getWorkRequests(filters?: {
     status?: string;
-    campus_id?: string;
+    property_id?: string;
     category?: string;
     priority?: Priority;
     is_historic?: boolean;
+    client_contact_id?: string;
   }) {
     let query = supabase.from('work_requests').select('*');
 
     if (filters?.status) {
       query = query.eq('status', filters.status);
     }
-    if (filters?.campus_id) {
-      query = query.eq('campus_id', filters.campus_id);
+    if (filters?.property_id) {
+      query = query.eq('property_id', filters.property_id);
     }
     if (filters?.category) {
       query = query.eq('category', filters.category);
@@ -26,6 +27,9 @@ export const workRequestService = {
     }
     if (filters?.is_historic !== undefined) {
       query = query.eq('is_historic', filters.is_historic);
+    }
+    if (filters?.client_contact_id) {
+      query = query.eq('client_contact_id', filters.client_contact_id);
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
@@ -45,10 +49,20 @@ export const workRequestService = {
   },
 
   // Create new work request with enhanced fields
-  async createWorkRequest(workRequest: Omit<WorkRequest, 'id' | 'request_number' | 'created_at' | 'updated_at'>) {
+  async createWorkRequest(
+    workRequest: Omit<WorkRequest, 'id' | 'created_at' | 'updated_at'> & { request_number?: string }
+  ) {
+    const payload = {
+      ...workRequest,
+      request_number:
+        workRequest.request_number && workRequest.request_number.trim().length > 0
+          ? workRequest.request_number
+          : `WR-${Date.now()}`,
+    };
+
     const { data, error } = await supabase
       .from('work_requests')
-      .insert([workRequest])
+      .insert([payload])
       .select()
       .single();
     if (error) throw error;
@@ -127,14 +141,14 @@ export const workRequestService = {
   },
 
   // Get work requests by priority
-  async getWorkRequestsByPriority(priority: Priority, campus_id?: string) {
+  async getWorkRequestsByPriority(priority: Priority, property_id?: string) {
     let query = supabase
       .from('work_requests')
       .select('*')
       .eq('priority', priority);
     
-    if (campus_id) {
-      query = query.eq('campus_id', campus_id);
+    if (property_id) {
+      query = query.eq('property_id', property_id);
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
@@ -143,14 +157,14 @@ export const workRequestService = {
   },
 
   // Get historic work requests
-  async getHistoricWorkRequests(campus_id?: string) {
+  async getHistoricWorkRequests(property_id?: string) {
     let query = supabase
       .from('work_requests')
       .select('*')
       .eq('is_historic', true);
     
-    if (campus_id) {
-      query = query.eq('campus_id', campus_id);
+    if (property_id) {
+      query = query.eq('property_id', property_id);
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });
@@ -192,14 +206,14 @@ export const workRequestService = {
   },
 
   // Get critical priority items
-  async getCriticalItems(campus_id?: string) {
+  async getCriticalItems(property_id?: string) {
     let query = supabase
       .from('work_requests')
       .select('*')
       .eq('priority', 'Critical');
     
-    if (campus_id) {
-      query = query.eq('campus_id', campus_id);
+    if (property_id) {
+      query = query.eq('property_id', property_id);
     }
 
     const { data, error } = await query.order('created_at', { ascending: false });

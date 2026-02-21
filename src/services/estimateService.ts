@@ -1,77 +1,63 @@
 import { supabase } from './supabaseClient';
+import type { Estimate, EstimateLineItem } from '../types';
 
-export interface LineItem {
-  description: string;
-  labor_hours?: number;
-  rate?: number;
-  materials?: number;
-  amount: number;
-}
-
-export interface Estimate {
-  id?: string;
-  work_request_id: string;
-  line_items: LineItem[];
-  total_amount: number;
-  not_to_exceed?: number;
-  status: 'Draft' | 'Submitted' | 'Approved' | 'Changes Requested';
-  notes?: string;
-}
+// Re-export as LineItem alias for backwards compatibility
+export type LineItem = EstimateLineItem;
 
 export const estimateService = {
   // Get estimate for work request
-  async getEstimate(workRequestId: string) {
+  async getEstimate(workRequestId: string): Promise<Estimate | undefined> {
     const { data, error } = await supabase
       .from('estimates')
       .select('*')
       .eq('work_request_id', workRequestId)
-      .single();
-    if (error && error.code !== 'PGRST116') throw error; // PGRST116 = no rows
-    return data;
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data || undefined;
   },
 
   // Create estimate
-  async createEstimate(estimate: Estimate) {
+  async createEstimate(estimate: Partial<Estimate>): Promise<Estimate> {
     const { data, error } = await supabase
       .from('estimates')
       .insert([estimate])
       .select()
       .single();
+    
     if (error) throw error;
     return data;
   },
 
   // Update estimate
-  async updateEstimate(id: string, updates: Partial<Estimate>) {
+  async updateEstimate(id: string, updates: Partial<Estimate>): Promise<Estimate> {
     const { data, error } = await supabase
       .from('estimates')
       .update(updates)
       .eq('id', id)
       .select()
       .single();
+    
     if (error) throw error;
     return data;
   },
 
   // Save estimate as draft
-  async saveDraft(workRequestId: string, lineItems: LineItem[], totalAmount: number, notes?: string) {
+  async saveDraft(workRequestId: string, lineItems: EstimateLineItem[], totalAmount: number, notes?: string) {
     const existing = await this.getEstimate(workRequestId);
 
+    const payload = {
+      work_request_id: workRequestId,
+      line_items: lineItems,
+      total_amount: totalAmount,
+      status: 'Draft' as const,
+      notes,
+    };
+
     if (existing) {
-      return this.updateEstimate(existing.id, {
-        line_items: lineItems,
-        total_amount: totalAmount,
-        status: 'Draft',
-        notes,
-      });
+      return this.updateEstimate(existing.id, payload);
     } else {
-      return this.createEstimate({
-        work_request_id: workRequestId,
-        line_items: lineItems,
-        total_amount: totalAmount,
-        status: 'Draft',
-        notes,
-      });
+      return this.createEstimate(payload);
     }
   },
 
@@ -79,7 +65,8 @@ export const estimateService = {
   async submitEstimate(id: string) {
     return this.updateEstimate(id, {
       status: 'Submitted',
-    });
+      submitted_at: new Date().toISOString(),
+    } as Partial<Estimate>);
   },
 
   // Approve estimate
@@ -94,24 +81,26 @@ export const estimateService = {
       .eq('id', id)
       .select()
       .single();
+    
     if (error) throw error;
     return data;
   },
 
   // Request changes
-  async requestChanges(id: string) {
+  async requestChanges(id: string, notes?: string) {
     return this.updateEstimate(id, {
-      status: 'Changes Requested',
+      status: 'Rejected' as Estimate['status'],
+      notes,
     });
   },
 
   // Calculate total from line items
-  calculateTotal(lineItems: LineItem[]): number {
-    return lineItems.reduce((sum, item) => sum + item.amount, 0);
+  calculateTotal(lineItems: EstimateLineItem[]): number {
+    return lineItems.reduce((sum, item) => sum + (item.amount ?? 0), 0);
   },
 
   // Validate line items
-  validateLineItems(lineItems: LineItem[]): { valid: boolean; errors: string[] } {
+  validateLineItems(lineItems: EstimateLineItem[]): { valid: boolean; errors: string[] } {
     const errors: string[] = [];
 
     lineItems.forEach((item, index) => {

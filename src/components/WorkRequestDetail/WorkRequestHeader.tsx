@@ -1,6 +1,6 @@
 import { ChevronLeft, Edit2, CheckCircle } from 'lucide-react';
 import type { WorkOrder, WorkOrderStatus } from '../../data/pipeline';
-import { getSiteById, getCampusById } from '../../data/pipeline';
+import { getSiteById, getPropertyById } from '../../data/pipeline';
 
 interface WorkRequestHeaderProps {
   workOrder: WorkOrder;
@@ -51,13 +51,13 @@ export function WorkRequestHeader({
   onEditClick,
 }: WorkRequestHeaderProps) {
   const site = getSiteById(workOrder.siteId);
-  const campus = site ? getCampusById(site.campusId) : undefined;
+  const property = site ? getPropertyById(site.propertyId) : undefined;
 
   return (
     <div className="mb-8">
       <button
         onClick={onBackClick}
-        className="flex items-center gap-2 text-[#143352] hover:text-[#143352]/80 mb-4"
+        className="flex items-center gap-2 text-[#0f2749] hover:text-[#0f2749]/80 mb-4"
       >
         <ChevronLeft className="w-5 h-5" />
         Back to Work Requests
@@ -80,7 +80,7 @@ export function WorkRequestHeader({
           </div>
           <p className="text-xl text-neutral-700">{workOrder.title}</p>
           <p className="text-neutral-500 mt-1">
-            {site?.name} - {campus?.name}
+            {site?.name} - {property?.name}
           </p>
         </div>
         <button
@@ -103,7 +103,7 @@ export function WorkRequestHeader({
                 <div
                   className={`flex items-center justify-center w-8 h-8 rounded-full text-xs font-medium ${
                     isCurrent
-                      ? 'bg-[#143352] text-white'
+                      ? 'bg-[#0f2749] text-white'
                       : isPast
                       ? 'bg-green-500 text-white'
                       : 'bg-gray-200 text-gray-500'
@@ -113,7 +113,7 @@ export function WorkRequestHeader({
                 </div>
                 <span
                   className={`ml-2 text-xs ${
-                    isCurrent ? 'text-[#143352] font-medium' : isPast ? 'text-green-600' : 'text-gray-400'
+                    isCurrent ? 'text-[#0f2749] font-medium' : isPast ? 'text-green-600' : 'text-gray-400'
                   }`}
                 >
                   {status.replace(/([A-Z])/g, ' $1').trim()}

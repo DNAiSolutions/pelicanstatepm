@@ -19,10 +19,10 @@ export function PortalLandingPage() {
             {viewingMessage && <p className="text-xs text-emerald-600 mt-1">{viewingMessage}</p>}
           </div>
           <button
-            onClick={() => navigate('/work-requests/new')}
-            className="border border-neutral-300 text-neutral-700 px-4 py-2 text-sm"
+            onClick={() => navigate(`/client-portal/requests/new${contactId ? `?contactId=${contactId}` : ''}`)}
+            className="border border-neutral-300 text-neutral-700 px-4 py-2 text-sm rounded-full"
           >
-            New Work Order
+            New Request
           </button>
         </div>
       </header>
@@ -60,7 +60,7 @@ export function PortalLandingPage() {
                 <p className="text-sm text-neutral-600">{project.clientName}</p>
                 <p className="text-xs text-neutral-500">Budget {formatCurrency(project.spentBudget)} / {formatCurrency(project.totalBudget)}</p>
                 <button
-                  className="text-sm text-[#143352]"
+                  className="text-sm text-[#0f2749]"
                   onClick={() => navigate(`/client-portal/projects/${project.id}${contactId ? `?contactId=${contactId}` : ''}`)}
                 >
                   View project

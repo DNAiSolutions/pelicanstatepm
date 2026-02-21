@@ -1,10 +1,10 @@
-import type { Lead } from '../data/pipeline';
+import type { Lead } from '../types';
 
 const STORAGE_KEY = 'ps_walkthrough_draft';
 
 export type WalkthroughDraft = {
   leadId: string;
-  campusId?: string;
+  propertyId?: string;
   contactName: string;
   phone: string;
   email: string;
@@ -16,13 +16,13 @@ export type WalkthroughDraft = {
 export function saveWalkthroughDraftFromLead(lead: Lead) {
   const draft: WalkthroughDraft = {
     leadId: lead.id,
-    campusId: lead.campusId,
-    contactName: lead.contactName,
+    propertyId: lead.property_id,
+    contactName: lead.contact_name,
     phone: lead.phone,
     email: lead.email,
-    summary: lead.intakeMetadata?.issueSummary || lead.notes || '',
+    summary: lead.intake_metadata?.issue_summary || lead.notes || '',
     urgency: lead.urgency,
-    jobAddress: lead.jobAddress,
+    jobAddress: lead.job_address,
   };
   try {
     sessionStorage.setItem(STORAGE_KEY, JSON.stringify(draft));

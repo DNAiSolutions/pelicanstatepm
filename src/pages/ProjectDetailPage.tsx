@@ -2,9 +2,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
-  mockCampuses,
-  mockSites,
-  mockUsers,
   type Contact,
   type Lead,
   type Project,
@@ -21,6 +18,7 @@ import {
   type PermitRecord,
   type PermitInspection,
   type HistoricArtifact,
+  type Site,
 } from '../data/pipeline';
 import { projectService } from '../services/projectService';
 import { leadService } from '../services/leadService';
@@ -34,6 +32,8 @@ import { paymentSyncService } from '../services/paymentSyncService';
 import { auditLogService } from '../services/auditLogService';
 import { permitService } from '../services/permitService';
 import { historicEvidenceService } from '../services/historicEvidenceService';
+import { propertyService, type Property } from '../services/propertyService';
+import { supabase } from '../services/supabaseClient';
 import {
   ArrowLeft,
   Calendar,
@@ -41,17 +41,34 @@ import {
   Phone,
   Plus,
   Share2,
+  Sparkles,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { useAuth } from '../context/AuthContext';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
 
 type Tab = 'overview' | 'board' | 'list' | 'plan' | 'financials' | 'contracts' | 'milestones' | 'ledger' | 'permits' | 'historic';
 
+async function fetchSiteById(siteId: string): Promise<Site | null> {
+  const { data, error } = await supabase.from('sites').select('*').eq('id', siteId).maybeSingle();
+  if (error && error.code !== 'PGRST116') throw error;
+  if (!data) return null;
+  return {
+    id: data.id,
+    propertyId: data.property_id,
+    name: data.name,
+    address: data.address ?? '',
+    isHistoric: Boolean(data.is_historic),
+    historicNotes: data.historic_notes ?? undefined,
+  };
+}
+
 export function ProjectDetailPage() {
   const { projectId } = useParams<{ projectId: string }>();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [project, setProject] = useState<Project | null>(null);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
@@ -90,10 +107,11 @@ export function ProjectDetailPage() {
   const [historicForm, setHistoricForm] = useState({ artifactType: 'MaterialSpec' as HistoricArtifact['artifactType'], description: '', evidenceUrls: '' });
   const [creatingEstimate, setCreatingEstimate] = useState(false);
   const [lastEstimateResult, setLastEstimateResult] = useState<{ total: number; workRequestId: string } | null>(null);
-  const currentUser = useMemo(() => mockUsers.find((user) => user.id === 'user-1') || mockUsers[0], []);
-  const canManageFinancials = useMemo(() => (currentUser ? ['Owner', 'Finance'].includes(currentUser.role) : false), [currentUser]);
-  const canRunAIRecommendations = useMemo(() => (currentUser ? ['Owner', 'Finance', 'PM'].includes(currentUser.role) : false), [currentUser]);
-  const canRunAIPricing = useMemo(() => (currentUser ? ['Owner', 'Finance'].includes(currentUser.role) : false), [currentUser]);
+  const currentUserRole = user?.role ?? 'Owner';
+  const currentUserId = user?.id ?? 'system-user';
+  const canManageFinancials = useMemo(() => ['Owner', 'Finance', 'Developer'].includes(currentUserRole), [currentUserRole]);
+  const canRunAIRecommendations = useMemo(() => ['Owner', 'Finance', 'PM', 'Developer'].includes(currentUserRole), [currentUserRole]);
+  const canRunAIPricing = useMemo(() => ['Owner', 'Finance', 'Developer'].includes(currentUserRole), [currentUserRole]);
 
   const [newLead, setNewLead] = useState({ companyName: '', contactName: '', email: '', phone: '', estimatedValue: 25000 });
   const [newContact, setNewContact] = useState<{ name: string; title: string; email: string; phone: string; type: Contact['type'] }>({
@@ -103,6 +121,9 @@ export function ProjectDetailPage() {
     phone: '',
     type: 'Client',
   });
+  const [property, setProperty] = useState<Property | null>(null);
+  const [site, setSite] = useState<Site | null>(null);
+  const [notesDraft, setNotesDraft] = useState('');
 
   const [showTaskModal, setShowTaskModal] = useState(false);
   const [taskTemplate, setTaskTemplate] = useState<TaskTemplate>('default');
@@ -115,45 +136,50 @@ export function ProjectDetailPage() {
         navigate('/projects');
         return;
       }
-    try {
-      setLoading(true);
-      const proj = await projectService.getProject(projectId);
-      if (!proj) {
+      try {
+        setLoading(true);
+        const proj = await projectService.getProject(projectId);
+        if (!proj) {
+          navigate('/projects');
+          return;
+        }
+        const [projLeads, projContacts, financialSnapshot, projectInvoices, projectPermits, projectArtifacts, siteRecord, propertyRecord] = await Promise.all([
+          projectService.getProjectLeads(projectId),
+          projectService.getProjectContacts(projectId),
+          projectService.getFinancialSnapshot(projectId),
+          projectService.getProjectInvoices(projectId),
+          projectService.getProjectPermits(projectId),
+          projectService.getProjectHistoricArtifacts(projectId),
+          proj.siteId ? fetchSiteById(proj.siteId) : Promise.resolve(null),
+          proj.propertyId ? propertyService.getProperty(proj.propertyId) : Promise.resolve(null),
+        ]);
+        const inspectionEntries = await Promise.all(
+          projectPermits.map(async (permit) => [permit.id, await permitService.listInspections(permit.id)] as const)
+        );
+        const ledgerEntries = await contractService.listCostLedger(projectId);
+        setProject(proj);
+        setNotesDraft(proj.internalNotes ?? '');
+        setProperty(propertyRecord ?? null);
+        setSite(siteRecord);
+        setLeads(projLeads);
+        setContacts(projContacts);
+        setTasks(projectTaskService.getByProject(projectId));
+        setContracts(financialSnapshot.contracts);
+        setFinancialTotals(financialSnapshot.totals);
+        setSelectedContractId((prev) => prev || financialSnapshot.contracts[0]?.id || '');
+        setLedgerEntries(ledgerEntries);
+        setAiRecommendations(aiDecisionService.listContractRecommendations(projectId));
+        setAiPricingSnapshots(aiDecisionService.listPricingSnapshots(projectId));
+        setLedgerForm((prev) => ({ ...prev, contractId: financialSnapshot.contracts[0]?.id || '' }));
+        setInvoices(projectInvoices);
+        setPermits(projectPermits);
+        setInspectionsByPermit(Object.fromEntries(inspectionEntries));
+        setHistoricArtifacts(projectArtifacts);
+      } catch (error) {
+        toast.error('Unable to load project');
         navigate('/projects');
-        return;
-      }
-      const projLeads = await projectService.getProjectLeads(projectId);
-      const projContacts = await projectService.getProjectContacts(projectId);
-      const projTasks = projectTaskService.getByProject(projectId);
-      const financialSnapshot = await projectService.getFinancialSnapshot(projectId);
-      const contractList = financialSnapshot.contracts;
-      const projectInvoices = await projectService.getProjectInvoices(projectId);
-      const projectPermits = await projectService.getProjectPermits(projectId);
-      const inspectionMap: Record<string, PermitInspection[]> = {};
-      projectPermits.forEach((permit) => {
-        inspectionMap[permit.id] = permitService.listInspections(permit.id);
-      });
-      const projectArtifacts = await projectService.getProjectHistoricArtifacts(projectId);
-      setProject(proj);
-      setLeads(projLeads);
-      setContacts(projContacts);
-      setTasks(projTasks);
-      setContracts(contractList);
-      setFinancialTotals(financialSnapshot.totals);
-      setSelectedContractId((prev) => prev || contractList[0]?.id || '');
-      setLedgerEntries(contractService.listCostLedger(projectId));
-      setAiRecommendations(aiDecisionService.listContractRecommendations(projectId));
-      setAiPricingSnapshots(aiDecisionService.listPricingSnapshots(projectId));
-      setLedgerForm((prev) => ({ ...prev, contractId: contractList[0]?.id || '' }));
-      setInvoices(projectInvoices);
-      setPermits(projectPermits);
-      setInspectionsByPermit(inspectionMap);
-      setHistoricArtifacts(projectArtifacts);
-    } catch (error) {
-      toast.error('Unable to load project');
-      navigate('/projects');
-    } finally {
-      setLoading(false);
+      } finally {
+        setLoading(false);
       }
     }
     load();
@@ -184,26 +210,38 @@ export function ProjectDetailPage() {
     setInvoices(projectInvoices);
   };
 
-  const refreshPermits = () => {
+  const refreshPermits = async () => {
     if (!project) return;
-    const projectPermits = permitService.list(project.id);
-    const map: Record<string, PermitInspection[]> = {};
-    projectPermits.forEach((permit) => {
-      map[permit.id] = permitService.listInspections(permit.id);
-    });
-    setPermits(projectPermits);
-    setInspectionsByPermit(map);
+    try {
+      const projectPermits = await projectService.getProjectPermits(project.id);
+      const inspectionEntries = await Promise.all(
+        projectPermits.map(async (permit) => [permit.id, await permitService.listInspections(permit.id)] as const)
+      );
+      setPermits(projectPermits);
+      setInspectionsByPermit(Object.fromEntries(inspectionEntries));
+    } catch (error) {
+      toast.error('Unable to refresh permits');
+    }
   };
 
-  const site = useMemo(() => mockSites.find((s) => s.id === project?.siteId), [project]);
-  const campus = useMemo(() => mockCampuses.find((c) => c.id === project?.campusId), [project]);
-  const owner = useMemo(() => mockUsers.find((u) => u.id === project?.internalOwnerId), [project]);
   const selectedContract = useMemo(() => contracts.find((contract) => contract.id === selectedContractId), [contracts, selectedContractId]);
   const isHistoricProject = useMemo(() => {
     if (site?.isHistoric) return true;
     if (project?.clientSummary?.toLowerCase().includes('historic')) return true;
     return false;
   }, [site, project]);
+
+  const primaryContact = useMemo(() => {
+    return contacts[0] ?? {
+      name: project?.clientName ?? 'Client Contact',
+      email: project?.clientEmail ?? '',
+      phone: project?.clientPhone ?? '',
+      title: 'Primary Contact',
+    };
+  }, [contacts, project?.clientEmail, project?.clientName, project?.clientPhone]);
+
+  const lineItems = useMemo(() => tasks.slice(0, 4), [tasks]);
+  const visitRows = useMemo(() => tasks.filter((task) => ['Scheduled', 'InProgress', 'Blocked'].includes(task.status)), [tasks]);
 
   const columns = useMemo(() => {
     const map = { todo: [] as WorkOrder[], inprogress: [] as WorkOrder[], done: [] as WorkOrder[] };
@@ -229,7 +267,7 @@ export function ProjectDetailPage() {
         stage: 'New',
         source: 'Inbound',
         notes: 'Captured in project workspace',
-        campusId: project.campusId,
+        propertyId: project.propertyId,
         projectId: project.id,
         contactIds: [],
       });
@@ -248,7 +286,7 @@ export function ProjectDetailPage() {
       const contact = await contactService.create({
         ...newContact,
         company: project.clientName,
-        campusId: project.campusId,
+        propertyId: project.propertyId,
         projectIds: [project.id],
         leadIds: [],
         preferredChannel: 'Email',
@@ -262,62 +300,74 @@ export function ProjectDetailPage() {
     }
   };
 
-  const handleAddLedgerEntry = (event: React.FormEvent) => {
+  const handleAddLedgerEntry = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!project || !ledgerForm.contractId) return;
-    if (!canManageFinancials || !currentUser) {
+    if (!canManageFinancials) {
       toast.error('You do not have permission to record financial entries.');
       return;
     }
-    const entry = contractService.addCostLedgerEntry({
-      projectId: project.id,
-      contractId: ledgerForm.contractId,
-      category: ledgerForm.category,
-      description: ledgerForm.description,
-      committedAmount: ledgerForm.committedAmount ? Number(ledgerForm.committedAmount) : undefined,
-      actualAmount: ledgerForm.actualAmount ? Number(ledgerForm.actualAmount) : undefined,
-      vendorId: ledgerForm.vendorId,
-      recordedBy: currentUser.id,
-    });
-    setLedgerEntries((prev) => [...prev, entry]);
-    toast.success('Cost ledger updated');
-    setLedgerForm((prev) => ({ ...prev, description: '', committedAmount: undefined, actualAmount: undefined, vendorId: '' }));
+    try {
+      const entry = await contractService.addCostLedgerEntry({
+        projectId: project.id,
+        contractId: ledgerForm.contractId,
+        category: ledgerForm.category,
+        description: ledgerForm.description,
+        committedAmount: ledgerForm.committedAmount ? Number(ledgerForm.committedAmount) : undefined,
+        actualAmount: ledgerForm.actualAmount ? Number(ledgerForm.actualAmount) : undefined,
+        vendorId: ledgerForm.vendorId,
+        recordedBy: currentUserId,
+      });
+      setLedgerEntries((prev) => [...prev, entry]);
+      toast.success('Cost ledger updated');
+      setLedgerForm((prev) => ({ ...prev, description: '', committedAmount: undefined, actualAmount: undefined, vendorId: '' }));
+    } catch (error) {
+      toast.error('Unable to record ledger entry');
+    }
   };
 
-  const handleAddPermit = (event: React.FormEvent) => {
+  const handleAddPermit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!project) return;
-    permitService.create({
-      projectId: project.id,
-      jurisdictionName: permitForm.jurisdictionName,
-      jurisdictionType: permitForm.jurisdictionType,
-      permitType: permitForm.permitType,
-      codeSet: permitForm.codeSet,
-      codeVersion: permitForm.codeVersion,
-      reviewerAuthority: permitForm.reviewerAuthority,
-      reviewerContact: permitForm.reviewerContact,
-      status: permitForm.status,
-      notes: permitForm.notes,
-    });
-    refreshPermits();
-    setPermitForm((prev) => ({ ...prev, jurisdictionName: '', reviewerContact: '', notes: '' }));
-    toast.success('Permit record added');
+    try {
+      await permitService.create({
+        projectId: project.id,
+        jurisdictionName: permitForm.jurisdictionName,
+        jurisdictionType: permitForm.jurisdictionType,
+        permitType: permitForm.permitType,
+        codeSet: permitForm.codeSet,
+        codeVersion: permitForm.codeVersion,
+        reviewerAuthority: permitForm.reviewerAuthority,
+        reviewerContact: permitForm.reviewerContact,
+        status: permitForm.status,
+        notes: permitForm.notes,
+      });
+      await refreshPermits();
+      setPermitForm((prev) => ({ ...prev, jurisdictionName: '', reviewerContact: '', notes: '' }));
+      toast.success('Permit record added');
+    } catch (error) {
+      toast.error('Unable to add permit');
+    }
   };
 
-  const handleAddInspection = (event: React.FormEvent) => {
+  const handleAddInspection = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!inspectionForm.permitId) {
       toast.error('Select a permit');
       return;
     }
-    permitService.addInspection({
-      permitId: inspectionForm.permitId,
-      inspectionType: inspectionForm.inspectionType,
-      scheduledAt: inspectionForm.scheduledAt || undefined,
-    });
-    refreshPermits();
-    setInspectionForm((prev) => ({ ...prev, scheduledAt: '' }));
-    toast.success('Inspection logged');
+    try {
+      await permitService.addInspection({
+        permitId: inspectionForm.permitId,
+        inspectionType: inspectionForm.inspectionType,
+        scheduledAt: inspectionForm.scheduledAt || undefined,
+      });
+      await refreshPermits();
+      setInspectionForm((prev) => ({ ...prev, scheduledAt: '' }));
+      toast.success('Inspection logged');
+    } catch (error) {
+      toast.error('Unable to log inspection');
+    }
   };
 
   const handleGenerateRecommendation = () => {
@@ -335,11 +385,24 @@ export function ProjectDetailPage() {
       historicFlag: site?.isHistoric,
       permitComplexity: site?.isHistoric ? 'High' : 'Medium',
       durationDays,
-      clientType: campus?.name,
+      clientType: property?.name,
       riskTolerance: project.status === 'Planning' ? 'Low' : 'Medium',
     });
     setAiRecommendations((prev) => [recommendation, ...prev]);
     toast.success('AI contract recommendation generated');
+  };
+
+  const handleSaveNotes = async () => {
+    if (!project) return;
+    try {
+      const updated = await projectService.updateProject(project.id, { internalNotes: notesDraft });
+      if (updated) {
+        setProject(updated);
+      }
+      toast.success('Notes updated');
+    } catch (error) {
+      toast.error('Unable to save notes');
+    }
   };
 
   const handleGeneratePricingSnapshot = () => {
@@ -425,13 +488,13 @@ export function ProjectDetailPage() {
   };
 
   const handleSyncStripe = async (invoiceId: string) => {
-    if (!currentUser || !canManageFinancials) {
+    if (!user || !canManageFinancials) {
       toast.error('Only finance or owner roles can sync payments.');
       return;
     }
     try {
       setSyncingStripeInvoiceId(invoiceId);
-      await paymentSyncService.syncInvoiceToStripe(invoiceId, currentUser.id);
+      await paymentSyncService.syncInvoiceToStripe(invoiceId, user.id);
       await refreshInvoices();
       toast.success('Invoice synced to Stripe');
     } catch (error) {
@@ -442,14 +505,14 @@ export function ProjectDetailPage() {
   };
 
   const handleSyncQuickBooks = async (invoiceId: string) => {
-    if (!currentUser || !canManageFinancials) {
+    if (!user || !canManageFinancials) {
       toast.error('Only finance or owner roles can sync payments.');
       return;
     }
     try {
       setSyncingQboInvoiceId(invoiceId);
       const customerName = project?.clientName || 'Client';
-      await paymentSyncService.syncInvoiceToQuickBooks(invoiceId, customerName, currentUser.id);
+      await paymentSyncService.syncInvoiceToQuickBooks(invoiceId, customerName, user.id);
       await refreshInvoices();
       toast.success('Invoice synced to QuickBooks');
     } catch (error) {
@@ -464,23 +527,27 @@ export function ProjectDetailPage() {
     setSelectedInvoiceAudit(auditLogService.listByEntity(invoiceId));
   };
 
-  const handleAddHistoricArtifact = (event: React.FormEvent) => {
+  const handleAddHistoricArtifact = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!project) return;
     const evidence = historicForm.evidenceUrls
       .split(/\n|,/)
       .map((url) => url.trim())
       .filter((url) => url.length > 0);
-    const artifact = historicEvidenceService.create({
-      projectId: project.id,
-      artifactType: historicForm.artifactType,
-      description: historicForm.description,
-      evidenceUrls: evidence,
-      reviewerRequired: true,
-    });
-    setHistoricArtifacts((prev) => [artifact, ...prev]);
-    setHistoricForm({ artifactType: historicForm.artifactType, description: '', evidenceUrls: '' });
-    toast.success('Historic artifact recorded');
+    try {
+      const artifact = await historicEvidenceService.create({
+        projectId: project.id,
+        artifactType: historicForm.artifactType,
+        description: historicForm.description,
+        evidenceUrls: evidence,
+        reviewerRequired: true,
+      });
+      setHistoricArtifacts((prev) => [artifact, ...prev]);
+      setHistoricForm({ artifactType: historicForm.artifactType, description: '', evidenceUrls: '' });
+      toast.success('Historic artifact recorded');
+    } catch (error) {
+      toast.error('Unable to record artifact');
+    }
   };
 
   const handleAddTask = (event: React.FormEvent) => {
@@ -506,7 +573,7 @@ export function ProjectDetailPage() {
   if (loading || !project) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-[#143352]/20 border-t-[#143352] rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-[#0f2749]/20 border-t-[#0f2749] rounded-full animate-spin" />
       </div>
     );
   }
@@ -538,7 +605,7 @@ export function ProjectDetailPage() {
             <div key={idx} className="flex items-center gap-2 text-xs text-neutral-500">
               <span>Q{idx + 1}</span>
               <div className="flex-1 h-2 bg-neutral-100 rounded-full">
-                <div className="h-full bg-[#143352] rounded-full" style={{ width: `${value}%` }} />
+                <div className="h-full bg-[#0f2749] rounded-full" style={{ width: `${value}%` }} />
               </div>
             </div>
           ))}
@@ -655,7 +722,7 @@ export function ProjectDetailPage() {
             <input value={newLead.email} onChange={(e) => setNewLead({ ...newLead, email: e.target.value })} required placeholder="Email" className="border border-neutral-300 px-3 py-2" />
             <input value={newLead.phone} onChange={(e) => setNewLead({ ...newLead, phone: e.target.value })} required placeholder="Phone" className="border border-neutral-300 px-3 py-2" />
             <input type="number" value={newLead.estimatedValue} onChange={(e) => setNewLead({ ...newLead, estimatedValue: Number(e.target.value) })} placeholder="Est. Value" className="border border-neutral-300 px-3 py-2" />
-            <button type="submit" className="bg-[#143352] text-white flex items-center justify-center gap-2 text-sm">
+            <button type="submit" className="bg-[#0f2749] text-white flex items-center justify-center gap-2 text-sm">
               <Plus className="w-4 h-4" /> Add Lead
             </button>
           </form>
@@ -690,7 +757,7 @@ export function ProjectDetailPage() {
               <option value="Vendor">Vendor</option>
               <option value="Partner">Partner</option>
             </select>
-            <button type="submit" className="bg-[#143352] text-white flex items-center justify-center gap-2 text-sm">
+            <button type="submit" className="bg-[#0f2749] text-white flex items-center justify-center gap-2 text-sm">
               <Plus className="w-4 h-4" /> Add Contact
             </button>
           </form>
@@ -703,7 +770,7 @@ export function ProjectDetailPage() {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <p className="text-sm text-neutral-600">Drag cards to update status. Costs roll into overview.</p>
-        <button onClick={() => setShowTaskModal(true)} className="inline-flex items-center gap-2 bg-[#143352] text-white px-4 py-2 text-sm">
+        <button onClick={() => setShowTaskModal(true)} className="inline-flex items-center gap-2 bg-[#0f2749] text-white px-4 py-2 text-sm">
           <Plus className="w-4 h-4" /> Add Task
         </button>
       </div>
@@ -765,7 +832,7 @@ export function ProjectDetailPage() {
           <button
             key={contract.id}
             onClick={() => setSelectedContractId(contract.id)}
-            className={`px-3 py-1.5 text-xs border ${selectedContractId === contract.id ? 'bg-[#143352] text-white border-[#143352]' : 'border-neutral-200 text-neutral-600'}`}
+            className={`px-3 py-1.5 text-xs border ${selectedContractId === contract.id ? 'bg-[#0f2749] text-white border-[#0f2749]' : 'border-neutral-200 text-neutral-600'}`}
           >
             {contract.contractType} • {contract.billingMethod}
           </button>
@@ -835,7 +902,7 @@ export function ProjectDetailPage() {
                         <button
                           onClick={() => handleSyncStripe(invoice.id)}
                           disabled={!canManageFinancials || !!syncingStripeInvoiceId}
-                          className="text-[#143352] underline disabled:opacity-50"
+                          className="text-[#0f2749] underline disabled:opacity-50"
                           title={!canManageFinancials ? 'Only finance or owner roles can sync payments' : undefined}
                         >
                           {syncingStripeInvoiceId === invoice.id ? 'Syncing…' : 'Sync to Stripe'}
@@ -849,7 +916,7 @@ export function ProjectDetailPage() {
                         <button
                           onClick={() => handleSyncQuickBooks(invoice.id)}
                           disabled={!canManageFinancials || !!syncingQboInvoiceId}
-                          className="text-[#143352] underline disabled:opacity-50"
+                          className="text-[#0f2749] underline disabled:opacity-50"
                           title={!canManageFinancials ? 'Only finance or owner roles can sync payments' : undefined}
                         >
                           {syncingQboInvoiceId === invoice.id ? 'Syncing…' : 'Sync to QBO'}
@@ -897,7 +964,7 @@ export function ProjectDetailPage() {
             disabled={!canRunAIPricing}
             title={!canRunAIPricing ? 'Only Owner or Finance can run AI pricing' : undefined}
             className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs border uppercase tracking-[0.2em] ${
-              canRunAIPricing ? 'border-[#143352] text-[#143352]' : 'border-neutral-200 text-neutral-400 cursor-not-allowed'
+              canRunAIPricing ? 'border-[#0f2749] text-[#0f2749]' : 'border-neutral-200 text-neutral-400 cursor-not-allowed'
             }`}
           >
             Run AI Pricing
@@ -950,7 +1017,7 @@ export function ProjectDetailPage() {
             disabled={!canRunAIRecommendations}
             title={!canRunAIRecommendations ? 'Only PM, Owner, or Finance can run recommendations' : undefined}
             className={`inline-flex items-center gap-2 px-3 py-1.5 text-xs border uppercase tracking-[0.2em] ${
-              canRunAIRecommendations ? 'border-[#143352] text-[#143352]' : 'border-neutral-200 text-neutral-400 cursor-not-allowed'
+              canRunAIRecommendations ? 'border-[#0f2749] text-[#0f2749]' : 'border-neutral-200 text-neutral-400 cursor-not-allowed'
             }`}
           >
             Run AI Recommendation
@@ -1132,7 +1199,7 @@ export function ProjectDetailPage() {
             <input type="number" value={ledgerForm.actualAmount ?? ''} onChange={(e) => setLedgerForm({ ...ledgerForm, actualAmount: e.target.value ? Number(e.target.value) : undefined })} placeholder="Actual Amount" className="border border-neutral-300 px-3 py-2" />
             <input value={ledgerForm.vendorId || ''} onChange={(e) => setLedgerForm({ ...ledgerForm, vendorId: e.target.value })} placeholder="Vendor / PO" className="border border-neutral-300 px-3 py-2" />
             <div className="md:col-span-2 flex items-center justify-end">
-              <button type="submit" className="px-4 py-2 bg-[#143352] text-white text-sm" disabled={!canManageFinancials}>
+              <button type="submit" className="px-4 py-2 bg-[#0f2749] text-white text-sm" disabled={!canManageFinancials}>
                 Record Cost
               </button>
             </div>
@@ -1223,7 +1290,7 @@ export function ProjectDetailPage() {
           </select>
           <textarea value={permitForm.notes} onChange={(e) => setPermitForm({ ...permitForm, notes: e.target.value })} placeholder="Notes" className="border border-neutral-300 px-3 py-2 md:col-span-2" rows={3} />
           <div className="md:col-span-2 flex items-center justify-end">
-            <button type="submit" className="px-4 py-2 bg-[#143352] text-white text-sm">Save Permit</button>
+            <button type="submit" className="px-4 py-2 bg-[#0f2749] text-white text-sm">Save Permit</button>
           </div>
         </form>
       </section>
@@ -1243,7 +1310,7 @@ export function ProjectDetailPage() {
           </select>
           <input type="date" value={inspectionForm.scheduledAt} onChange={(e) => setInspectionForm({ ...inspectionForm, scheduledAt: e.target.value })} className="border border-neutral-300 px-3 py-2" />
           <div className="md:col-span-3 flex items-center justify-end">
-            <button type="submit" className="px-4 py-2 bg-[#143352] text-white text-sm">Log Inspection</button>
+            <button type="submit" className="px-4 py-2 bg-[#0f2749] text-white text-sm">Log Inspection</button>
           </div>
         </form>
       </section>
@@ -1297,7 +1364,7 @@ export function ProjectDetailPage() {
           <textarea value={historicForm.description} onChange={(e) => setHistoricForm({ ...historicForm, description: e.target.value })} placeholder="Describe artifact (materials, method, justification)" className="border border-neutral-300 px-3 py-2 md:col-span-2" rows={3} required />
           <textarea value={historicForm.evidenceUrls} onChange={(e) => setHistoricForm({ ...historicForm, evidenceUrls: e.target.value })} placeholder="Evidence URLs (comma or newline separated)" className="border border-neutral-300 px-3 py-2 md:col-span-2" rows={2} />
           <div className="md:col-span-2 flex items-center justify-end">
-            <button type="submit" className="px-4 py-2 bg-[#143352] text-white text-sm">Save Artifact</button>
+            <button type="submit" className="px-4 py-2 bg-[#0f2749] text-white text-sm">Save Artifact</button>
           </div>
         </form>
         {!isHistoricProject && <p className="text-xs text-neutral-500">Historic mode currently off for this project.</p>}
@@ -1307,19 +1374,31 @@ export function ProjectDetailPage() {
 
   return (
     <div className="space-y-6">
-      <button onClick={() => navigate('/projects')} className="inline-flex items-center gap-2 text-[#143352]">
+      <button onClick={() => navigate('/projects')} className="inline-flex items-center gap-2 text-[#0f2749]">
         <ArrowLeft className="w-4 h-4" /> Back to Projects
       </button>
 
-      <section className="bg-white border border-neutral-200 p-6 space-y-3">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-xs text-neutral-500">{campus?.name} • {site?.name}</p>
-            <h1 className="text-3xl font-heading font-bold text-neutral-900">{project.name}</h1>
-            <p className="text-sm text-neutral-600">{project.clientSummary}</p>
+      <section className="card p-6 space-y-6">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="space-y-2">
+            <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">{property?.name ?? 'Property'} • {site?.name ?? 'Site'}</p>
+            <h1 className="text-3xl font-heading text-[var(--text-body)]">{project.name}</h1>
+            <p className="text-sm text-[var(--text-muted)] max-w-2xl">{project.clientSummary || 'No summary provided yet.'}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <p className="text-xs text-[var(--text-muted)] uppercase">Property address</p>
+                <p className="font-medium text-[var(--text-body)]">{site?.address || 'TBD'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-[var(--text-muted)] uppercase">Contact details</p>
+                <p className="font-medium text-[var(--text-body)]">{primaryContact.name}</p>
+                <p className="text-[var(--text-muted)] flex items-center gap-2"><Phone className="w-4 h-4" /> {primaryContact.phone || '—'}</p>
+                <p className="text-[var(--text-muted)] flex items-center gap-2"><Mail className="w-4 h-4" /> {primaryContact.email || '—'}</p>
+              </div>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="px-3 py-1 text-xs bg-neutral-100 text-neutral-700">{project.status}</span>
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="px-3 py-1 text-xs rounded-full bg-[rgba(15,109,55,0.08)] text-[var(--brand-primary)]">{project.status}</span>
             <button
               onClick={async () => {
                 const token = await projectService.generateClientLink(project.id);
@@ -1328,14 +1407,14 @@ export function ProjectDetailPage() {
                   toast.success('Client link copied');
                 }
               }}
-              className="text-sm text-neutral-600 inline-flex items-center gap-1"
+              className="btn-secondary flex items-center gap-2"
             >
               <Share2 className="w-4 h-4" /> Share
             </button>
             <button
               onClick={handleGenerateAiEstimate}
               disabled={creatingEstimate}
-              className={`text-sm inline-flex items-center gap-2 px-4 py-2 border ${creatingEstimate ? 'border-neutral-200 text-neutral-400' : 'border-[#143352] text-[#143352]'}`}
+              className={`inline-flex items-center gap-2 px-4 py-2 rounded-full border text-sm ${creatingEstimate ? 'text-neutral-400' : 'text-[var(--brand-primary)] border-[var(--brand-primary)]'}`}
             >
               {creatingEstimate ? 'Creating…' : 'Create Estimate'}
             </button>
@@ -1346,18 +1425,167 @@ export function ProjectDetailPage() {
             Draft saved to work order {lastEstimateResult.workRequestId} for {formatCurrency(lastEstimateResult.total)}.
           </div>
         )}
-        <div className="flex flex-wrap gap-6 text-sm text-neutral-600">
-          <span>Owner: {owner?.name || 'Unassigned'}</span>
-          <span className="flex items-center gap-1"><Calendar className="w-4 h-4" /> {project.startDate} – {project.endDate}</span>
-          <span>Value: {formatCurrency(project.totalBudget)}</span>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm text-[var(--text-muted)]">
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em]">Job Type</p>
+            <p className="text-[var(--text-body)] font-semibold">{project.status}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em]">Started</p>
+            <p className="text-[var(--text-body)] font-semibold">{project.startDate}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em]">Ends</p>
+            <p className="text-[var(--text-body)] font-semibold">{project.endDate}</p>
+          </div>
+          <div>
+            <p className="text-[10px] uppercase tracking-[0.2em]">Billing</p>
+            <p className="text-[var(--text-body)] font-semibold">Upon job completion</p>
+          </div>
         </div>
       </section>
 
-      <div className="border-b border-neutral-200 flex gap-4">
-        {[
-          { id: 'overview', label: 'Overview' },
-          { id: 'board', label: 'Task Board' },
-          { id: 'plan', label: 'Plan & Files' },
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+        <div className="card p-6 xl:col-span-2 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Line Items</p>
+              <h2 className="text-xl font-heading text-[var(--text-body)]">Scope & Pricing</h2>
+            </div>
+            <button onClick={() => setShowTaskModal(true)} className="btn-primary text-sm flex items-center gap-2">
+              <Plus className="w-4 h-4" /> New Line Item
+            </button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase text-[var(--text-muted)]">
+                <tr>
+                  <th className="text-left py-3">Product / Service</th>
+                  <th className="text-left py-3">Quantity</th>
+                  <th className="text-left py-3">Price</th>
+                  <th className="text-left py-3">Total</th>
+                </tr>
+              </thead>
+              <tbody>
+                {lineItems.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-4 text-center text-[var(--text-muted)]">No line items yet. Add a task to start building your scope.</td>
+                  </tr>
+                )}
+                {lineItems.map((task) => {
+                  const materialAllowance = task.materials?.reduce((sum, material) => sum + (material.unitCost ?? 0) * (material.quantity ?? 1), 0) ?? 0;
+                  const laborAllowance = task.labor?.reduce((sum, labor) => sum + (labor.rate ?? 0) * (labor.hours ?? 0), 0) ?? 0;
+                  const total = materialAllowance + laborAllowance || project.totalBudget / Math.max(tasks.length, 1);
+                  return (
+                    <tr key={task.id} className="border-t border-[var(--border-subtle)]">
+                      <td className="py-3 pr-4">
+                        <p className="font-medium text-[var(--text-body)]">{task.title}</p>
+                        <p className="text-xs text-[var(--text-muted)]">{task.description}</p>
+                      </td>
+                      <td className="py-3 text-[var(--text-muted)]">{task.materials?.[0]?.quantity ?? 1}</td>
+                      <td className="py-3 text-[var(--text-muted)]">{materialAllowance ? formatCurrency(materialAllowance) : '—'}</td>
+                      <td className="py-3 text-[var(--text-body)] font-semibold">{formatCurrency(total)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Visits</p>
+              <h2 className="text-xl font-heading text-[var(--text-body)]">Next Steps</h2>
+            </div>
+            <button className="btn-secondary text-xs" onClick={() => setShowTaskModal(true)}>New Visit</button>
+          </div>
+          {visitRows.length === 0 ? (
+            <p className="text-sm text-[var(--text-muted)]">No visits scheduled. Convert a task into a visit to keep crews on track.</p>
+          ) : (
+            <ul className="space-y-3">
+              {visitRows.map((visit) => (
+                <li key={visit.id} className="flex items-center justify-between text-sm">
+                  <div>
+                    <p className="font-medium text-[var(--text-body)]">{visit.title}</p>
+                    <p className="text-xs text-[var(--text-muted)]">{visit.targetEndDate || 'Schedule TBD'}</p>
+                  </div>
+                  <span className="text-xs px-2 py-1 rounded-full border">{visit.status}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+        <div className="card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Invoices</p>
+              <h2 className="text-xl font-heading text-[var(--text-body)]">Billing</h2>
+            </div>
+            <button onClick={() => navigate('/invoices/new')} className="btn-secondary text-sm">Create Invoice</button>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="text-xs uppercase text-[var(--text-muted)]">
+                <tr>
+                  <th className="text-left py-2">Invoice</th>
+                  <th className="text-left py-2">Due</th>
+                  <th className="text-left py-2">Status</th>
+                  <th className="text-right py-2">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.length === 0 && (
+                  <tr>
+                    <td colSpan={4} className="py-4 text-center text-[var(--text-muted)]">No invoices yet.</td>
+                  </tr>
+                )}
+                {invoices.map((invoice) => (
+                  <tr key={invoice.id} className="border-t border-[var(--border-subtle)]">
+                    <td className="py-2 font-medium text-[var(--text-body)]">{invoice.invoiceNumber || invoice.id}</td>
+                    <td className="py-2 text-[var(--text-muted)]">{invoice.dueDate || 'Pending'}</td>
+                    <td className="py-2 text-[var(--text-muted)]">{invoice.status}</td>
+                    <td className="py-2 text-right text-[var(--text-body)]">{formatCurrency(invoice.balanceDue ?? 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+        <div className="card p-6 space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Internal Notes</p>
+              <h2 className="text-xl font-heading text-[var(--text-body)]">Team Only</h2>
+            </div>
+            <button onClick={handleGenerateRecommendation} className="btn-secondary text-xs flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> AI Assist
+            </button>
+          </div>
+          <textarea value={notesDraft} onChange={(e) => setNotesDraft(e.target.value)} rows={4} className="input-field" placeholder="Share context for your team" />
+          <div className="flex justify-between text-xs text-[var(--text-muted)]">
+            <span>Only your team can see these notes.</span>
+            <button onClick={handleSaveNotes} className="text-[var(--brand-primary)] font-semibold">Save Notes</button>
+          </div>
+        </div>
+      </div>
+
+      <section className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Advanced Workspace</p>
+            <h2 className="text-xl font-heading text-[var(--text-body)]">Legacy Tools & AI Planning</h2>
+          </div>
+        </div>
+
+        <div className="border-b border-neutral-200 flex gap-4">
+          {[
+            { id: 'overview', label: 'Overview' },
+            { id: 'board', label: 'Task Board' },
+            { id: 'plan', label: 'Plan & Files' },
           { id: 'financials', label: 'Financials' },
           { id: 'contracts', label: 'Contracts' },
           { id: 'milestones', label: 'Milestones' },
@@ -1368,22 +1596,23 @@ export function ProjectDetailPage() {
           <button
             key={tab.id}
             onClick={() => setActiveTab(tab.id as Tab)}
-            className={`pb-2 text-sm font-medium ${activeTab === tab.id ? 'text-[#143352] border-b-2 border-[#143352]' : 'text-neutral-500'}`}
+            className={`pb-2 text-sm font-medium ${activeTab === tab.id ? 'text-[#0f2749] border-b-2 border-[#0f2749]' : 'text-neutral-500'}`}
           >
             {tab.label}
           </button>
         ))}
-      </div>
+        </div>
 
-      {activeTab === 'overview' && overviewContent}
-      {activeTab === 'board' && boardContent}
-      {activeTab === 'plan' && planContent}
-      {activeTab === 'financials' && financialsContent}
-      {activeTab === 'contracts' && contractsContent}
-      {activeTab === 'milestones' && milestonesContent}
-      {activeTab === 'ledger' && ledgerContent}
-      {activeTab === 'permits' && permitsContent}
-      {activeTab === 'historic' && historicContent}
+        {activeTab === 'overview' && overviewContent}
+        {activeTab === 'board' && boardContent}
+        {activeTab === 'plan' && planContent}
+        {activeTab === 'financials' && financialsContent}
+        {activeTab === 'contracts' && contractsContent}
+        {activeTab === 'milestones' && milestonesContent}
+        {activeTab === 'ledger' && ledgerContent}
+        {activeTab === 'permits' && permitsContent}
+        {activeTab === 'historic' && historicContent}
+      </section>
 
       {showTaskModal && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
@@ -1431,7 +1660,7 @@ export function ProjectDetailPage() {
                 <button type="button" onClick={() => setShowTaskModal(false)} className="px-4 py-2 border border-neutral-300 text-neutral-600">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-2 bg-[#143352] text-white">
+                <button type="submit" className="px-4 py-2 bg-[#0f2749] text-white">
                   Save Task
                 </button>
               </div>

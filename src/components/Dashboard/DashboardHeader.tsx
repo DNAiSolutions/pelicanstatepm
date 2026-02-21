@@ -16,14 +16,14 @@ export function DashboardHeader({ onNewIntakeClick, onNewWorkRequestClick }: Das
       <div className="flex items-center gap-3">
         <button
           onClick={onNewIntakeClick}
-          className="flex items-center gap-2 px-4 py-2 bg-[#143352] text-white hover:bg-[#143352]/90 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-[#0f2749] text-white hover:bg-[#0f2749]/90 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Intake
         </button>
         <button
           onClick={onNewWorkRequestClick}
-          className="flex items-center gap-2 px-4 py-2 border border-[#143352] text-[#143352] hover:bg-[#143352]/5 transition-colors"
+          className="flex items-center gap-2 px-4 py-2 border border-[#0f2749] text-[#0f2749] hover:bg-[#0f2749]/5 transition-colors"
         >
           <Plus className="w-4 h-4" />
           New Work Request

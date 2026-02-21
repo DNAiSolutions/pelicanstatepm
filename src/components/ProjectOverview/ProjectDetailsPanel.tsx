@@ -1,6 +1,6 @@
 import { Phone, Mail, MapPin, Filter, ArrowRight } from 'lucide-react';
-import type { Project } from '../../data/pipeline';
-import { mockCampuses } from '../../data/pipeline';
+import type { Project } from '../../types';
+import { mockProperties } from '../../data/pipeline';
 import { projectTaskService } from '../../services/projectTaskService';
 
 interface ProjectDetailsPanelProps {
@@ -43,18 +43,18 @@ export function ProjectDetailsPanel({
             </span>
           </div>
           <div className="space-y-2 text-sm text-neutral-600">
-            <p className="font-semibold text-neutral-900">{selectedProject.clientName}</p>
+            <p className="font-semibold text-neutral-900">{selectedProject.client_name}</p>
             <p className="flex items-center gap-2">
-              <Phone className="w-4 h-4 text-[#143352]" />
-              {selectedProject.clientPhone}
+              <Phone className="w-4 h-4 text-[#0f2749]" />
+              {selectedProject.client_phone}
             </p>
             <p className="flex items-center gap-2">
-              <Mail className="w-4 h-4 text-[#143352]" />
-              {selectedProject.clientEmail}
+              <Mail className="w-4 h-4 text-[#0f2749]" />
+              {selectedProject.client_email}
             </p>
             <p className="flex items-center gap-2">
-              <MapPin className="w-4 h-4 text-[#143352]" />
-              {selectedProject.clientSummary}
+              <MapPin className="w-4 h-4 text-[#0f2749]" />
+              {selectedProject.client_summary}
             </p>
           </div>
         </div>
@@ -67,17 +67,17 @@ export function ProjectDetailsPanel({
             style={{
               background: `conic-gradient(#27AE60 0% ${Math.min(
                 100,
-                Math.round((selectedProject.spentBudget / selectedProject.totalBudget) * 100)
+                Math.round((selectedProject.spent_budget / selectedProject.total_budget) * 100)
               )}%, #E5E7EB ${Math.min(
                 100,
-                Math.round((selectedProject.spentBudget / selectedProject.totalBudget) * 100)
+                Math.round((selectedProject.spent_budget / selectedProject.total_budget) * 100)
               )}% 100%)`,
             }}
           >
             <div className="w-32 h-32 bg-white rounded-full flex flex-col items-center justify-center">
               <span className="text-4xl font-heading font-semibold text-neutral-900">
                 {Math.round(
-                  (selectedProject.spentBudget / selectedProject.totalBudget) * 100
+                  (selectedProject.spent_budget / selectedProject.total_budget) * 100
                 )}%
               </span>
               <span className="text-xs text-neutral-500">Budget consumed</span>
@@ -98,7 +98,7 @@ export function ProjectDetailsPanel({
               <div key={idx} className="flex items-center gap-3">
                 <span className="text-xs text-neutral-500">Q{idx + 1}</span>
                 <div className="flex-1 h-8 bg-neutral-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-[#143352]" style={{ width: `${value}%` }} />
+                  <div className="h-full bg-[#0f2749]" style={{ width: `${value}%` }} />
                 </div>
               </div>
             ))}
@@ -115,11 +115,11 @@ export function ProjectDetailsPanel({
               <p className="text-xs uppercase text-neutral-500">Budget</p>
               <div className="flex justify-between text-sm text-neutral-600">
                 <span>Total</span>
-                <span>{formatCurrency(selectedProject.totalBudget)}</span>
+                <span>{formatCurrency(selectedProject.total_budget)}</span>
               </div>
               <div className="flex justify-between text-sm text-neutral-600">
                 <span>Spent</span>
-                <span>{formatCurrency(selectedProject.spentBudget)}</span>
+                <span>{formatCurrency(selectedProject.spent_budget)}</span>
               </div>
               <div className="mt-2 h-2 bg-neutral-100 rounded-full">
                 <div
@@ -128,7 +128,7 @@ export function ProjectDetailsPanel({
                     width: `${Math.min(
                       100,
                       Math.round(
-                        (selectedProject.spentBudget / selectedProject.totalBudget) * 100
+                        (selectedProject.spent_budget / selectedProject.total_budget) * 100
                       )
                     )}%`,
                   }}
@@ -138,11 +138,11 @@ export function ProjectDetailsPanel({
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <p className="text-xs uppercase text-neutral-500">Start Date</p>
-                <p className="text-sm text-neutral-900">{selectedProject.startDate}</p>
+                <p className="text-sm text-neutral-900">{selectedProject.start_date}</p>
               </div>
               <div>
                 <p className="text-xs uppercase text-neutral-500">End Date</p>
-                <p className="text-sm text-neutral-900">{selectedProject.endDate}</p>
+                <p className="text-sm text-neutral-900">{selectedProject.end_date}</p>
               </div>
             </div>
           </div>
@@ -187,7 +187,7 @@ export function ProjectDetailsPanel({
           <div>
             <p className="text-lg font-heading font-semibold text-neutral-900">Projects</p>
             <p className="text-sm text-neutral-500">
-              All projects for {selectedProject.clientName}
+              All projects for {selectedProject.client_name}
             </p>
           </div>
           <button className="text-sm text-neutral-500 flex items-center gap-1">
@@ -199,7 +199,7 @@ export function ProjectDetailsPanel({
             <thead className="text-xs uppercase text-neutral-500">
               <tr>
                 <th className="text-left px-6 py-3">Project</th>
-                <th className="text-left px-6 py-3">Campus</th>
+                <th className="text-left px-6 py-3">Property</th>
                 <th className="text-left px-6 py-3">Status</th>
                 <th className="text-right px-6 py-3">Budget</th>
                 <th className="text-right px-6 py-3">Active Tasks</th>
@@ -227,13 +227,13 @@ export function ProjectDetailsPanel({
                       <div>
                         <p>{projectRow.name}</p>
                         <p className="text-xs text-neutral-500 truncate">
-                          {projectRow.clientSummary}
+                          {projectRow.client_summary}
                         </p>
                       </div>
                     </td>
                     <td className="px-6 py-3 text-neutral-600">
-                      {mockCampuses.find((c) => c.id === projectRow.campusId)?.name ||
-                        'Campus TBD'}
+                      {mockProperties.find((c) => c.id === projectRow.property_id)?.name ||
+                        'Property TBD'}
                     </td>
                     <td className="px-6 py-3">
                       <span
@@ -247,11 +247,11 @@ export function ProjectDetailsPanel({
                       </span>
                     </td>
                     <td className="px-6 py-3 text-right text-neutral-900">
-                      {formatCurrency(projectRow.totalBudget)}
+                      {formatCurrency(projectRow.total_budget)}
                     </td>
                     <td className="px-6 py-3 text-right text-neutral-600">{activeTasks}</td>
                     <td className="px-6 py-3 text-right text-neutral-600">
-                      <span className="inline-flex items-center gap-1 text-[#143352] text-xs font-semibold">
+                      <span className="inline-flex items-center gap-1 text-[#0f2749] text-xs font-semibold">
                         View <ArrowRight className="w-3 h-3" />
                       </span>
                     </td>

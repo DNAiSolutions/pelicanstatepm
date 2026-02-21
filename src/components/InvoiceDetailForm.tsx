@@ -1,19 +1,20 @@
-import type { InvoiceLineItem, WorkRequest } from '../types';
-import type { Campus } from '../services/campusService';
+import type { WorkRequest } from '../types';
+import type { InvoiceLineItem } from '../types';
+import type { Property } from '../services/propertyService';
 import { Plus, Trash2, AlertCircle } from 'lucide-react';
 
 interface Props {
-  campuses: Campus[];
+  properties: Property[];
   selectedWorkRequests: WorkRequest[];
   lineItems: InvoiceLineItem[];
-  onAddItem: (campusId: string) => void;
+  onAddItem: (propertyId: string) => void;
   onUpdateItem: (index: number, field: keyof InvoiceLineItem, value: any) => void;
   onRemoveItem: (index: number) => void;
   errors?: string;
 }
 
 export function InvoiceDetailForm({
-  campuses,
+  properties,
   selectedWorkRequests,
   lineItems,
   onAddItem,
@@ -21,18 +22,18 @@ export function InvoiceDetailForm({
   onRemoveItem,
   errors,
 }: Props) {
-  const campusLookup = new Map(campuses.map((campus) => [campus.id, campus]));
+  const propertyLookup = new Map(properties.map((property) => [property.id, property]));
   const workRequestLookup = new Map(selectedWorkRequests.map((wr) => [wr.id, wr]));
 
-  const campusGroups = selectedWorkRequests.reduce<Record<string, WorkRequest[]>>((acc, wr) => {
-    acc[wr.campus_id] = acc[wr.campus_id] ? [...acc[wr.campus_id], wr] : [wr];
+  const propertyGroups = selectedWorkRequests.reduce<Record<string, WorkRequest[]>>((acc, wr) => {
+    acc[wr.property_id] = acc[wr.property_id] ? [...acc[wr.property_id], wr] : [wr];
     return acc;
   }, {});
 
   const lineItemsWithIndex = lineItems.map((item, index) => ({ item, index }));
 
   const unassignedItems = lineItemsWithIndex.filter(
-    ({ item }) => !item.work_request_id || !workRequestLookup.get(item.work_request_id)
+    ({ item }) => !item.work_order_id || !workRequestLookup.get(item.work_order_id)
   );
 
   return (
@@ -44,34 +45,34 @@ export function InvoiceDetailForm({
         </div>
       )}
 
-      {Object.entries(campusGroups).map(([campusId, requests]) => {
-        const campus = campusLookup.get(campusId);
-        const campusLineItems = lineItemsWithIndex.filter(({ item }) => {
-          const wr = workRequestLookup.get(item.work_request_id);
-          return wr?.campus_id === campusId;
+      {Object.entries(propertyGroups).map(([propertyId, requests]) => {
+        const property = propertyLookup.get(propertyId);
+        const propertyLineItems = lineItemsWithIndex.filter(({ item }) => {
+          const wr = workRequestLookup.get(item.work_order_id);
+          return wr?.property_id === propertyId;
         });
 
         return (
-          <div key={campusId} className="border border-neutral-200 p-6 bg-neutral-50 space-y-4">
+          <div key={propertyId} className="border border-neutral-200 p-6 bg-neutral-50 space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-4">
               <div>
                 <p className="text-xl font-heading font-bold text-neutral-900">
-                  {campus?.name || 'Campus'} Invoice Details
+                  {property?.name || 'Property'} Invoice Details
                 </p>
-                <p className="text-sm text-neutral-600">Funding Source: {campus?.funding_source || 'N/A'}</p>
+                <p className="text-sm text-neutral-600">Funding Source: {property?.funding_source || 'N/A'}</p>
               </div>
               <button
                 type="button"
-                onClick={() => onAddItem(campusId)}
+                onClick={() => onAddItem(propertyId)}
                 className="btn-primary inline-flex items-center gap-2"
               >
                 <Plus className="w-5 h-5" /> Add Line Item
               </button>
             </div>
 
-            {campusLineItems.length === 0 ? (
+            {propertyLineItems.length === 0 ? (
               <div className="p-4 bg-white border border-dashed border-neutral-300 text-sm text-neutral-600">
-                No line items yet. Add work performed for {campus?.name}.
+                No line items yet. Add work performed for {property?.name}.
               </div>
             ) : (
               <div className="overflow-x-auto">
@@ -90,12 +91,12 @@ export function InvoiceDetailForm({
                     </tr>
                   </thead>
                   <tbody>
-                    {campusLineItems.map(({ item, index }) => (
-                      <tr key={`${campusId}-${index}`} className="border-b border-neutral-200">
+                    {propertyLineItems.map(({ item, index }) => (
+                      <tr key={`${propertyId}-${index}`} className="border-b border-neutral-200">
                         <td className="py-3 px-4">
                           <select
-                            value={item.work_request_id}
-                            onChange={(e) => onUpdateItem(index, 'work_request_id', e.target.value)}
+                          value={item.work_order_id}
+                          onChange={(e) => onUpdateItem(index, 'work_order_id', e.target.value)}
                             className="w-full border border-neutral-300 bg-white px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
                           >
                             <option value="">Select...</option>
@@ -162,8 +163,8 @@ export function InvoiceDetailForm({
                         </td>
                         <td className="py-3 px-4">
                           <textarea
-                            value={item.work_performed_notes || ''}
-                            onChange={(e) => onUpdateItem(index, 'work_performed_notes', e.target.value)}
+                          value={item.work_performed_notes || ''}
+                          onChange={(e) => onUpdateItem(index, 'work_performed_notes', e.target.value)}
                             rows={2}
                             className="w-64 border border-neutral-300 px-2 py-1 focus:outline-none focus:ring-2 focus:ring-primary-500"
                             placeholder="Detail what work was actually performed"
@@ -193,7 +194,7 @@ export function InvoiceDetailForm({
           <AlertCircle className="w-4 h-4 mt-0.5" />
           <div>
             <p className="font-semibold">Assign work requests to all line items</p>
-            <p>Some line items are not tied to a work request yet. Select a work request so the invoice can route to the correct campus.</p>
+            <p>Some line items are not tied to a work request yet. Select a work request so the invoice can route to the correct property.</p>
           </div>
         </div>
       )}

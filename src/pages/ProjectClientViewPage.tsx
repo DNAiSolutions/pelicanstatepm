@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { projectService } from '../services/projectService';
-import { mockWorkOrders, mockContacts, type Project } from '../data/pipeline';
+import { mockWorkOrders, mockContacts } from '../data/pipeline';
+import type { Project } from '../types';
 import toast from 'react-hot-toast';
 import { LeadIntakeModal } from '../components/leads/LeadIntakeModal';
 
@@ -18,7 +19,7 @@ export function ProjectClientViewPage() {
         return;
       }
       const proj = await projectService.getProject(projectId);
-      if (!proj || (proj.shareToken && proj.shareToken !== token)) {
+      if (!proj || (proj.share_token && proj.share_token !== token)) {
         setStatus('unauthorized');
         return;
       }
@@ -31,7 +32,7 @@ export function ProjectClientViewPage() {
   if (status === 'loading') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-neutral-50">
-        <div className="w-10 h-10 border-4 border-[#143352]/20 border-t-[#143352] rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-[#0f2749]/20 border-t-[#0f2749] rounded-full animate-spin" />
       </div>
     );
   }
@@ -68,20 +69,20 @@ export function ProjectClientViewPage() {
         </header>
 
         <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {project.clientVisibility.showBudget && (
+          {project.client_visibility.show_budget && (
             <div className="bg-white border border-neutral-200 p-5">
               <p className="text-xs text-neutral-500 uppercase">Budget</p>
-              <p className="text-2xl font-bold text-neutral-900">{formatCurrency(project.totalBudget)}</p>
-              <p className="text-sm text-neutral-600">Spent {formatCurrency(project.spentBudget)}</p>
+              <p className="text-2xl font-bold text-neutral-900">{formatCurrency(project.total_budget)}</p>
+              <p className="text-sm text-neutral-600">Spent {formatCurrency(project.spent_budget)}</p>
             </div>
           )}
           <div className="bg-white border border-neutral-200 p-5">
             <p className="text-xs text-neutral-500 uppercase">Timeline</p>
-            <p className="text-sm text-neutral-900">{project.startDate} – {project.endDate}</p>
+            <p className="text-sm text-neutral-900">{project.start_date} – {project.end_date}</p>
           </div>
         </section>
 
-        {project.clientVisibility.showTimeline && (
+        {(project as any).client_visibility?.showTimeline && (
           <section className="bg-white border border-neutral-200 p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-heading font-semibold text-neutral-900">Work Orders</h2>
@@ -105,7 +106,7 @@ export function ProjectClientViewPage() {
           </section>
         )}
 
-        {project.clientVisibility.showContacts && contacts.length > 0 && (
+        {(project as any).client_visibility?.showContacts && contacts.length > 0 && (
           <section className="bg-white border border-neutral-200 p-5">
             <h2 className="text-lg font-heading font-semibold text-neutral-900 mb-4">Key Contacts</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -128,7 +129,7 @@ export function ProjectClientViewPage() {
           </div>
           <button
             onClick={() => setShowIntakeModal(true)}
-            className="bg-[#143352] text-white px-4 py-2 text-sm font-medium"
+            className="bg-[#0f2749] text-white px-4 py-2 text-sm font-medium"
           >
             Open Intake Form
           </button>
@@ -140,9 +141,9 @@ export function ProjectClientViewPage() {
           open={showIntakeModal}
           onClose={() => setShowIntakeModal(false)}
           mode="client"
-          defaultCompany={project.clientName}
-          defaultContact={{ name: project.clientName, email: project.clientEmail, phone: project.clientPhone }}
-          defaultCampusId={project.campusId}
+          defaultCompany={project.client_name}
+          defaultContact={{ name: project.client_name, email: project.client_email, phone: project.client_phone }}
+          defaultPropertyId={project.property_id}
           defaultProjectId={project.id}
           onCreated={() => toast.success('Request submitted')}
         />

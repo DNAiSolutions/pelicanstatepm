@@ -100,7 +100,7 @@ URL: http://localhost:5174/work-requests
 Checklist:
 [ ] Table converts to card view (if responsive)
 [ ] OR table scrolls horizontally with visible scroll area
-[ ] Card view shows: Title, Campus, Status, Date
+[ ] Card view shows: Title, Property, Status, Date
 [ ] Action buttons are tappable (44x44px minimum)
 [ ] List items have adequate spacing (12px+ padding)
 [ ] Search/filter controls are accessible
@@ -113,7 +113,7 @@ Checklist:
 ```
 ┌─────────────────────────┐
 │ Title: HVAC Replacement │
-│ Campus: Wallace         │
+│ Property: Wallace         │
 │ Status: Intake          │
 │ Date: 2024-02-08        │
 │ [View] [Edit] [Delete]  │  ← Buttons
@@ -161,7 +161,7 @@ URL: http://localhost:5174/invoices/new
 
 Checklist:
 [ ] Work request dropdown is accessible
-[ ] Campus dropdown is full width
+[ ] Property dropdown is full width
 [ ] Funding source dropdown is full width
 [ ] Line items display in readable format
 [ ] Notes field has adequate height

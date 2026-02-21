@@ -1,0 +1,7 @@
+-- ==========================================================================
+-- Pelican State PM Dashboard - Seed Script
+-- --------------------------------------------------------------------------
+-- Intentionally left blank. This project no longer seeds demo data so that
+-- production profiles start with a clean slate. Use the Supabase dashboard
+-- or SQL editor to insert tenant-specific data when you go live.
+-- ==========================================================================

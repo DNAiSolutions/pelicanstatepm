@@ -75,7 +75,7 @@ export function OnboardingPage() {
 
   return (
     <div className="min-h-screen flex bg-[#f8f9fb]">
-      <div className="hidden lg:flex lg:w-1/2 bg-[#143352] text-white p-12 flex-col justify-center">
+      <div className="hidden lg:flex lg:w-1/2 bg-[#0f2749] text-white p-12 flex-col justify-center">
         <div className="max-w-lg">
           <div className="flex items-center gap-4 mb-6">
             <div className="w-16 h-16 bg-white/10 flex items-center justify-center rounded-full">
@@ -95,7 +95,7 @@ export function OnboardingPage() {
 
       <div className="w-full lg:w-1/2 flex items-center justify-center p-6">
         <div className="w-full max-w-lg bg-white border border-neutral-200 p-8">
-          <div className="flex items-center gap-3 mb-4 text-[#143352]">
+          <div className="flex items-center gap-3 mb-4 text-[#0f2749]">
             <ClipboardList className="w-6 h-6" />
             <div>
               <p className="text-xs uppercase tracking-widest text-neutral-500">Welcome</p>
@@ -113,7 +113,7 @@ export function OnboardingPage() {
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
                 placeholder="Your name"
-                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#143352]"
+                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#0f2749]"
               />
             </div>
 
@@ -122,7 +122,7 @@ export function OnboardingPage() {
               <select
                 value={role}
                 onChange={(e) => setRole(e.target.value)}
-                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#143352]"
+                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#0f2749]"
               >
                 {roleOptions.map((option) => (
                   <option key={option} value={option}>
@@ -138,7 +138,7 @@ export function OnboardingPage() {
                 value={department}
                 onChange={(e) => setDepartment(e.target.value)}
                 placeholder="e.g. Operations, Finance, Facilities"
-                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#143352]"
+                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#0f2749]"
               />
             </div>
 
@@ -147,7 +147,7 @@ export function OnboardingPage() {
               <select
                 value={teamSize}
                 onChange={(e) => setTeamSize(e.target.value)}
-                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#143352]"
+                className="w-full border border-neutral-200 bg-white px-4 py-3 text-sm text-neutral-800 focus:outline-none focus:border-[#0f2749]"
               >
                 <option value="1-5">1-5</option>
                 <option value="6-15">6-15</option>
@@ -159,7 +159,7 @@ export function OnboardingPage() {
             <div>
               <label className="text-sm font-medium text-neutral-700 mb-2 block">What type of access do you need?</label>
               <div className="flex flex-col gap-3">
-                <label className={`border px-4 py-3 cursor-pointer ${accountType === 'vendor' ? 'border-[#143352]' : 'border-neutral-200'}`}>
+                <label className={`border px-4 py-3 cursor-pointer ${accountType === 'vendor' ? 'border-[#0f2749]' : 'border-neutral-200'}`}>
                   <input
                     type="radio"
                     name="accessType"
@@ -170,7 +170,7 @@ export function OnboardingPage() {
                   />
                   Vendor / Partner – limited access to assigned projects
                 </label>
-                <label className={`border px-4 py-3 cursor-pointer ${accountType === 'staff' ? 'border-[#143352]' : 'border-neutral-200'}`}>
+                <label className={`border px-4 py-3 cursor-pointer ${accountType === 'staff' ? 'border-[#0f2749]' : 'border-neutral-200'}`}>
                   <input
                     type="radio"
                     name="accessType"
@@ -187,7 +187,7 @@ export function OnboardingPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full bg-[#143352] text-white py-3 text-sm font-semibold hover:bg-[#0F1F2D] transition-colors disabled:opacity-50"
+              className="w-full bg-[#0f2749] text-white py-3 text-sm font-semibold hover:bg-[#0F1F2D] transition-colors disabled:opacity-50"
             >
               {submitting ? 'Saving…' : 'Save My Preferences'}
             </button>
@@ -201,7 +201,7 @@ export function OnboardingPage() {
             <button
               type="button"
               onClick={() => navigate('/dashboard')}
-              className="text-[#143352] hover:underline"
+              className="text-[#0f2749] hover:underline"
             >
               Return to dashboard
             </button>

@@ -15,7 +15,7 @@ You should see the login page
 ## 🔐 Authentication Setup
 
 ### Test Accounts
-| Email | Role | Campus Access | Password |
+| Email | Role | Property Access | Password |
 |-------|------|---|---|
 | owner@pelicanstate.pro | Owner | All (Wallace, Woodland, Paris) | Use Supabase auth |
 | user@pelicanstate.pro | User | Wallace only | Use Supabase auth |
@@ -95,7 +95,7 @@ Click each sidebar menu item:
 ```
 1. Click "New Work Request" button (or use /work-requests/new)
 2. You should see a form with these fields:
-   - Campus (dropdown)
+   - Property (dropdown)
    - Title (text field)
    - Description (textarea)
    - Priority (dropdown: Low/Medium/High)
@@ -107,7 +107,7 @@ Click each sidebar menu item:
 ### Step 2.2: Fill Work Request Form
 ```
 Fill in the following information:
-- Campus: "Wallace" (or select from dropdown)
+- Property: "Wallace" (or select from dropdown)
 - Title: "HVAC Unit Replacement - Room 101"
 - Description: "Replace failing HVAC unit with new energy-efficient model"
 - Priority: "High"
@@ -157,7 +157,7 @@ Fill in the following information:
 1. You should now be on /work-requests page
 2. You should see a table with columns:
    - Request # (e.g., WR-001)
-   - Campus
+   - Property
    - Title
    - Status
    - Created Date
@@ -168,7 +168,7 @@ Fill in the following information:
 **Expected Result:**
 - At least 1 work request visible in list
 - Request shows "Intake" status
-- Campus is correctly displayed
+- Property is correctly displayed
 - Columns are sortable/filterable (if implemented)
 
 ### Step 3.2: View Work Request Detail
@@ -328,7 +328,7 @@ Check the following calculations:
 2. Navigate to /invoices/new
 3. You should see an invoice form with:
    - Work request dropdown
-   - Campus selector
+   - Property selector
    - Funding source selector
    - Line items (pre-populated from estimate)
    - Total amount
@@ -364,9 +364,9 @@ The following should auto-populate:
 - No data loss from estimate
 - Can edit line items if needed
 
-### Step 5.4: Select Campus & Funding
+### Step 5.4: Select Property & Funding
 ```
-1. Select Campus: "Wallace"
+1. Select Property: "Wallace"
 2. Select Funding Source: 
    - Look for options like "Operating Budget", "Capital Budget", etc.
    - Select any available option
@@ -411,7 +411,7 @@ Add notes: "Final invoice for HVAC replacement project. Unit installed and teste
 - PDF contains:
   - Invoice number
   - Date
-  - Campus name
+  - Property name
   - Funding source
   - All line items
   - Total amount
@@ -440,7 +440,7 @@ Add notes: "Final invoice for HVAC replacement project. Unit installed and teste
 3. You should see a table with:
    - Invoice number
    - Work request title
-   - Campus
+   - Property
    - Total amount
    - Status (should be "Pending" or "Draft")
    - Created date
@@ -492,12 +492,12 @@ Add notes: "Final invoice for HVAC replacement project. Unit installed and teste
 
 ---
 
-## Phase 7: Multi-Campus Testing 🏫
+## Phase 7: Multi-Property Testing 🏫
 
-### Step 7.1: Create Work Request for Different Campus
+### Step 7.1: Create Work Request for Different Property
 ```
 1. Click "New Work Request"
-2. Campus: Select "Woodland (Laplace)"
+2. Property: Select "Woodland (Laplace)"
 3. Title: "Roof Repair - Building C"
 4. Description: "Emergency roof repair after storm damage"
 5. Priority: "High"
@@ -507,11 +507,11 @@ Add notes: "Final invoice for HVAC replacement project. Unit installed and teste
 ```
 
 **Expected Result:**
-- Work request created for Woodland campus
+- Work request created for Woodland property
 - Appears in work request list
-- Campus filter shows "Woodland (Laplace)"
+- Property filter shows "Woodland (Laplace)"
 
-### Step 7.2: Create Estimate for Different Campus
+### Step 7.2: Create Estimate for Different Property
 ```
 1. Go to work request detail
 2. Create estimate with:
@@ -525,28 +525,28 @@ Add notes: "Final invoice for HVAC replacement project. Unit installed and teste
 **Expected Result:**
 - Estimate created
 - Status updates to "Estimate"
-- No campus conflicts
+- No property conflicts
 
-### Step 7.3: Create Invoice with Campus Info
+### Step 7.3: Create Invoice with Property Info
 ```
 1. Navigate to create new invoice
 2. Select the Woodland work request
-3. Campus should auto-select: "Woodland (Laplace)"
-4. Funding Source: May differ based on campus
+3. Property should auto-select: "Woodland (Laplace)"
+4. Funding Source: May differ based on property
 5. Submit invoice
 ```
 
 **Expected Result:**
-- Invoice associated with correct campus
-- Funding source reflects campus setting
-- PDF shows correct campus information
+- Invoice associated with correct property
+- Funding source reflects property setting
+- PDF shows correct property information
 
-### Step 7.4: Test Campus-Based Splitting (Optional)
+### Step 7.4: Test Property-Based Splitting (Optional)
 ```
 If invoice splitting is implemented:
 1. Create an invoice
-2. Look for "Add Campus" or "Split Invoice" option
-3. Add another campus
+2. Look for "Add Property" or "Split Invoice" option
+3. Add another property
 4. Split the total amount:
    - Wallace: 50% = $2,440
    - Woodland: 50% = $2,440
@@ -554,9 +554,9 @@ If invoice splitting is implemented:
 ```
 
 **Expected Result:**
-- Invoice can be split across campuses
+- Invoice can be split across properties
 - Percentages/amounts calculate correctly
-- PDF shows all campus allocations
+- PDF shows all property allocations
 
 ---
 
@@ -586,18 +586,18 @@ If invoice splitting is implemented:
 - Dashboard loads
 - This user has limited permissions
 
-### Step 8.3: Verify Campus Filtering
+### Step 8.3: Verify Property Filtering
 ```
 1. Create new work request
-2. Click Campus dropdown
+2. Click Property dropdown
 3. You should ONLY see: "Wallace"
 4. Woodland and Paris should NOT appear
 ```
 
 **Expected Result:**
-- Campus dropdown restricted to Wallace only
-- Cannot create work request for other campuses
-- Cannot access other campus data
+- Property dropdown restricted to Wallace only
+- Cannot create work request for other properties
+- Cannot access other property data
 
 ### Step 8.4: Verify Work Request Visibility
 ```
@@ -609,20 +609,20 @@ If invoice splitting is implemented:
 ```
 
 **Expected Result:**
-- User sees only their assigned campus data
-- No access to other campus information
+- User sees only their assigned property data
+- No access to other property information
 - Row-level security (RLS) is working
 
 ### Step 8.5: Logout and Re-login as Owner
 ```
 1. Logout
 2. Login with owner@pelicanstate.pro
-3. Verify you can see all campuses again
+3. Verify you can see all properties again
 ```
 
 **Expected Result:**
 - Full access restored
-- All campuses visible
+- All properties visible
 - All work requests visible
 
 ---
@@ -642,7 +642,7 @@ Generate and verify the following PDFs:
 
 2. Invoice PDF:
    - Contains invoice number and date
-   - Shows campus name
+   - Shows property name
    - Shows funding source
    - Lists all line items
    - Shows total amount
@@ -701,10 +701,10 @@ Test Case 3: Negative Values
 2. Try to submit
 Expected: Error message "Must be positive"
 
-Test Case 4: Missing Campus
-1. Leave Campus dropdown empty
+Test Case 4: Missing Property
+1. Leave Property dropdown empty
 2. Try to submit
-Expected: Error message "Campus is required"
+Expected: Error message "Property is required"
 ```
 
 **Expected Result:**
@@ -739,11 +739,11 @@ Test Case 1: No Work Request Selected
 3. Try to submit
 Expected: Error message "Work request required"
 
-Test Case 2: Missing Campus
+Test Case 2: Missing Property
 1. Select work request
-2. Leave campus empty
+2. Leave property empty
 3. Try to submit
-Expected: Error message "Campus required"
+Expected: Error message "Property required"
 ```
 
 **Expected Result:**
@@ -920,7 +920,7 @@ Test for all buttons:
 | 4 | Estimate Creation | ⬜ | ~4 min | |
 | 5 | Invoice Creation | ⬜ | ~4 min | |
 | 6 | Invoice List & Payment | ⬜ | ~2 min | |
-| 7 | Multi-Campus | ⬜ | ~5 min | |
+| 7 | Multi-Property | ⬜ | ~5 min | |
 | 8 | RBAC | ⬜ | ~5 min | |
 | 9 | PDF Generation | ⬜ | ~3 min | |
 | 10 | Form Validation | ⬜ | ~5 min | |
@@ -983,10 +983,10 @@ Test for all buttons:
 3. Try clearing browser cache (Ctrl+Shift+Delete)
 4. Check for JavaScript errors in console
 
-### Issue: "Multi-campus selection not working"
+### Issue: "Multi-property selection not working"
 **Solution:**
 1. Verify you're logged in as Owner role
-2. Check that all 3 campuses exist in database
+2. Check that all 3 properties exist in database
 3. Try creating new work request from scratch
 4. Check browser console for errors
 

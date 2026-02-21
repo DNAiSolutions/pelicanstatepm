@@ -1,16 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import {
-  mockContacts,
-  mockLeads,
-  mockSites,
-  mockUsers,
-  type Project,
-  type ConsultationChecklist as ConsultationChecklistModel,
-  type IntakeResearchSnippet,
-  type ScopeAnalysisResult,
-  type IntakeConversationState,
-  type Priority,
-} from '../data/pipeline';
+import { mockSites, type Project, type ConsultationChecklist as ConsultationChecklistModel, type IntakeResearchSnippet, type ScopeAnalysisResult, type IntakeConversationState, type Priority } from '../data/pipeline';
 import { projectService } from '../services/projectService';
 import { useProfileData } from '../hooks/useProfileData';
 import { projectTaskService, type TaskTemplate, type TemplateTask, type TemplateMaterial, type TemplateLabor, type ProjectPlan } from '../services/projectTaskService';
@@ -22,19 +11,12 @@ import { JobConversation } from '../components/intake/JobConversation';
 import { ScopeAnalysisPanel } from '../components/intake/ScopeAnalysisPanel';
 import { ConsultationChecklist } from '../components/intake/ConsultationChecklist';
 import { ResearchSnippets } from '../components/intake/ResearchSnippets';
-import {
-  Search,
-  Plus,
-  MapPin,
-  Phone,
-  Mail,
-  Filter,
-  Loader2,
-  ArrowRight,
-  ChevronDown,
-  RefreshCcw,
-  Info,
-} from 'lucide-react';
+import { propertyService, type Property as PropertyRecord } from '../services/propertyService';
+import { contactService } from '../services/contactService';
+import { leadService } from '../services/leadService';
+import { siteService } from '../services/siteService';
+import { useAuth } from '../context/AuthContext';
+import { Search, Plus, Loader2, RefreshCcw, Info } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { useNavigate } from 'react-router-dom';
 
@@ -44,6 +26,34 @@ const formatCurrency = (value: number) =>
     currency: 'USD',
     maximumFractionDigits: 0,
   }).format(value);
+
+type PropertyOption = {
+  id: string;
+  name: string;
+  fundingSource?: string;
+  priority?: Priority;
+};
+
+const mapPropertyOption = (property: PropertyRecord | PropertyOption): PropertyOption => ({
+  id: property.id,
+  name: property.name,
+  fundingSource:
+    'fundingSource' in property
+      ? property.fundingSource || 'Client Provided'
+      : (property as PropertyRecord).funding_source || 'Client Provided',
+  priority: property.priority,
+});
+
+const STATUS_CLASSES: Record<Project['status'], string> = {
+  Planning: 'bg-amber-50 text-amber-700 border border-amber-200',
+  PreConstruction: 'bg-sky-50 text-sky-700 border border-sky-200',
+  Active: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+  Closeout: 'bg-neutral-100 text-neutral-700 border border-neutral-200',
+  OnHold: 'bg-rose-50 text-rose-700 border border-rose-200',
+  Completed: 'bg-slate-100 text-slate-700 border border-slate-200',
+};
+
+const getStatusClass = (status: Project['status']) => STATUS_CLASSES[status] ?? 'bg-neutral-100 text-neutral-700 border border-neutral-200';
 
 type PlanEditsState = {
   questions: string[];
@@ -102,16 +112,23 @@ const buildWalkthroughTasks = (
 
 export function ProjectOverviewPage() {
   const navigate = useNavigate();
-  const { isAdminProfile, campuses } = useProfileData();
-  const [projects, setProjects] = useState<Project[]>([]);
-  const [selectedProjectId, setSelectedProjectId] = useState<string>('');
-  const [search, setSearch] = useState('');
-  const [campusFilter, setCampusFilter] = useState('');
+  const { user } = useAuth();
+  const { isAdminProfile, properties: profileProperties, leads: profileLeads, contacts: profileContacts } = useProfileData();
+  const profilePropertyOptions = useMemo(() => profileProperties.map(mapPropertyOption), [profileProperties]);
+  const [properties, setProperties] = useState<PropertyOption[]>(profilePropertyOptions);
+  const [leads, setLeads] = useState(profileLeads);
+  const [contacts, setContacts] = useState(profileContacts);
+  const propertyAssignments = useMemo(() => user?.propertyAssigned?.filter(Boolean) ?? [], [user?.propertyAssigned]);
+  const [supportingDataLoading, setSupportingDataLoading] = useState(isAdminProfile);
+  const [projects, setProjects] = useState<any[]>([]);
+  const [boardSearch, setBoardSearch] = useState('');
+  const [boardPropertyFilter, setBoardPropertyFilter] = useState('');
+  const [jobStatusFilter, setJobStatusFilter] = useState('All');
   const [isLoading, setIsLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-const [form, setForm] = useState({
+  const [form, setForm] = useState({
     name: '',
-    campusId: campuses[0]?.id || '',
+    propertyId: profilePropertyOptions[0]?.id || '',
     locationNotes: '',
     clientName: '',
     clientEmail: '',
@@ -123,14 +140,13 @@ const [form, setForm] = useState({
     contactId: '',
     clientMode: 'existing' as 'existing' | 'new',
     existingClient: '',
-    campusMode: 'existing' as 'existing' | 'new',
-    newCampusName: '',
-    newCampusFunding: '',
-    newCampusPriority: 'Medium' as Priority,
+    propertyMode: 'existing' as 'existing' | 'new',
+    newPropertyName: '',
+    newPropertyFunding: '',
+    newPropertyPriority: 'Medium' as Priority,
     scopeNotes: '',
     templateType: 'default' as TaskTemplate,
   });
-  const [expandedClients, setExpandedClients] = useState<Set<string>>(new Set());
   const [autoCreateTasks, setAutoCreateTasks] = useState(true);
   const [planVersion, setPlanVersion] = useState(0);
   const [planEdits, setPlanEdits] = useState<PlanEditsState | null>(null);
@@ -155,10 +171,6 @@ const [form, setForm] = useState({
         }
         const data = await projectService.getProjects();
         setProjects(data);
-        if (data[0]) {
-          setSelectedProjectId((prev) => prev || data[0].id);
-          setExpandedClients(new Set([data[0].clientName]));
-        }
       } catch (error) {
         toast.error('Unable to load projects');
       } finally {
@@ -169,22 +181,74 @@ const [form, setForm] = useState({
   }, [isAdminProfile]);
 
   useEffect(() => {
+    if (isAdminProfile) return;
+    setProperties(profilePropertyOptions);
+    setLeads(profileLeads);
+    setContacts(profileContacts);
+    setSupportingDataLoading(false);
+  }, [isAdminProfile, profilePropertyOptions, profileLeads, profileContacts]);
+
+  useEffect(() => {
+    if (!isAdminProfile) return;
+    let isMounted = true;
+    async function loadSupportingData() {
+      try {
+        setSupportingDataLoading(true);
+        const [propertyData, leadData, contactData] = await Promise.all([
+          propertyService.getProperties(),
+          leadService.list(),
+          contactService.list(),
+        ]);
+        if (!isMounted) return;
+        const scoped = propertyAssignments.length
+          ? propertyData.filter((property) => propertyAssignments.includes(property.id))
+          : propertyData;
+        setProperties(scoped.map(mapPropertyOption));
+        setLeads(leadData);
+        setContacts(contactData);
+      } catch (error) {
+        console.error('Failed to load project data', error);
+        toast.error('Unable to load project data');
+      } finally {
+        if (isMounted) {
+          setSupportingDataLoading(false);
+        }
+      }
+    }
+    loadSupportingData();
+    return () => {
+      isMounted = false;
+    };
+  }, [isAdminProfile, propertyAssignments]);
+
+  useEffect(() => {
+    if (form.propertyId || properties.length === 0) return;
+    setForm((prev) => ({ ...prev, propertyId: properties[0].id }));
+  }, [properties, form.propertyId]);
+
+  useEffect(() => {
+    if (boardPropertyFilter && !properties.some((property) => property.id === boardPropertyFilter)) {
+      setBoardPropertyFilter('');
+    }
+  }, [properties, boardPropertyFilter]);
+
+  useEffect(() => {
     if (!form.leadId) return;
-    const lead = mockLeads.find((lead) => lead.id === form.leadId);
+    const lead = leads.find((item) => item.id === form.leadId);
     if (lead) {
       setForm((prev) => ({
         ...prev,
-        clientName: lead.contactName,
+        clientName: (lead as any).contact_name ?? (lead as any).contactName,
         clientEmail: lead.email,
         clientPhone: lead.phone,
-        campusId: lead.campusId || prev.campusId,
+        propertyId: (lead as any).property_id ?? (lead as any).propertyId ?? prev.propertyId,
       }));
     }
-  }, [form.leadId]);
+  }, [form.leadId, leads]);
 
   useEffect(() => {
     if (form.clientMode === 'existing' && form.existingClient) {
-      const contact = mockContacts.find((c) => c.company === form.existingClient);
+      const contact = contacts.find((c) => c.company === form.existingClient);
       if (contact) {
         setForm((prev) => ({
           ...prev,
@@ -196,7 +260,7 @@ const [form, setForm] = useState({
         setForm((prev) => ({ ...prev, clientName: form.existingClient }));
       }
     }
-  }, [form.clientMode, form.existingClient]);
+  }, [form.clientMode, form.existingClient, contacts]);
 
   useEffect(() => {
     async function loadLaborRates() {
@@ -377,49 +441,67 @@ const [form, setForm] = useState({
     ];
   };
 
-  const projectsToShow = useMemo(() => {
-    return projects.filter((project) => {
-      const matchesSearch =
-        project.name.toLowerCase().includes(search.toLowerCase()) ||
-        project.clientName.toLowerCase().includes(search.toLowerCase());
-      const matchesCampus = !campusFilter || project.campusId === campusFilter;
-      return matchesSearch && matchesCampus;
+  const clientOptions = useMemo(() => {
+    const names = new Set<string>();
+    contacts.forEach((contact) => {
+      if (contact.company) {
+        names.add(contact.company);
+      }
     });
-  }, [projects, search, campusFilter]);
+    if (names.size === 0) {
+      projects.forEach((project) => names.add(project.client_name));
+    }
+    return Array.from(names).sort();
+  }, [contacts, projects]);
 
-  const groupedByClient = useMemo(() => {
-    const map: Record<string, Project[]> = {};
-    projectsToShow.forEach((project) => {
-      map[project.clientName] = map[project.clientName] || [];
-      map[project.clientName].push(project);
-    });
-    return Object.entries(map);
-  }, [projectsToShow]);
-
-  const selectedProject = useMemo(
-    () => projects.find((project) => project.id === selectedProjectId),
-    [projects, selectedProjectId]
+  const boardStatusOptions = useMemo(
+    () => ['All', ...Array.from(new Set(projects.map((project) => project.status)))],
+    [projects]
   );
 
-  const selectedClientProjects = useMemo(() => {
-    if (!selectedProject) return [] as Project[];
-    return projects.filter((project) => project.clientName === selectedProject.clientName);
-  }, [projects, selectedProject]);
+  const boardProjects = useMemo(() => {
+    return projects.filter((project) => {
+      const matchesSearch =
+        project.name.toLowerCase().includes(boardSearch.toLowerCase()) ||
+        (project.client_name ?? '').toLowerCase().includes(boardSearch.toLowerCase());
+      const matchesProperty = !boardPropertyFilter || project.property_id === boardPropertyFilter;
+      const matchesStatus = jobStatusFilter === 'All' || project.status === jobStatusFilter;
+      return matchesSearch && matchesProperty && matchesStatus;
+    });
+  }, [projects, boardSearch, boardPropertyFilter, jobStatusFilter]);
 
-  const clientOptions = useMemo(() => Array.from(new Set(projects.map((project) => project.clientName))).sort(), [projects]);
+  const summarySnapshot = useMemo(() => {
+    const now = new Date();
+    const inThirtyDays = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000);
+    let endingWithin = 0;
+    let late = 0;
+    let requiresInvoicing = 0;
+    let actionRequired = 0;
+    let unscheduled = 0;
+    projects.forEach((project) => {
+      const start = project.start_date ? new Date(project.start_date) : null;
+      const end = project.end_date ? new Date(project.end_date) : null;
+      if (end && end >= now && end <= inThirtyDays) endingWithin += 1;
+      if (end && end < now && ['Active', 'Planning'].includes(project.status)) late += 1;
+      if (project.status === 'Closeout') requiresInvoicing += 1;
+      if (project.status === 'OnHold') actionRequired += 1;
+      if (!start) unscheduled += 1;
+    });
+    return { endingWithin, late, requiresInvoicing, actionRequired, unscheduled };
+  }, [projects]);
 
-  useEffect(() => {
-    if (!projectsToShow.find((p) => p.id === selectedProjectId)) {
-      setSelectedProjectId(projectsToShow[0]?.id || '');
-    }
-    if (selectedProject) {
-      setExpandedClients((prev) => {
-        const next = new Set(prev);
-        next.add(selectedProject.clientName);
-        return next;
-      });
-    }
-  }, [projectsToShow, selectedProjectId, selectedProject]);
+  const visitStats = useMemo(() => {
+    const recent = projects.filter((project) => project.status === 'Active');
+    const recentValue = recent.reduce((total, project) => total + (project.total_budget ?? 0), 0);
+    const scheduled = projects.filter((project) => project.status === 'PreConstruction');
+    const scheduledValue = scheduled.reduce((total, project) => total + (project.total_budget ?? 0), 0);
+    return {
+      recentCount: recent.length,
+      recentValue,
+      scheduledCount: scheduled.length,
+      scheduledValue,
+    };
+  }, [projects]);
 
   useEffect(() => {
     if (!showModal) {
@@ -435,40 +517,75 @@ const [form, setForm] = useState({
   const handleCreateProject = async (event: React.FormEvent) => {
     event.preventDefault();
     try {
-      let campusId = form.campusId;
-      if (form.campusMode === 'new') {
-        if (!form.newCampusName.trim()) {
-          toast.error('Enter a campus name');
+      let propertyId = form.propertyId;
+      if (form.propertyMode === 'new') {
+        if (!form.newPropertyName.trim()) {
+          toast.error('Enter a property name');
           return;
         }
-        const newCampusId = `campus-${form.newCampusName.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now().toString(36)}`;
-        campuses.push({
-          id: newCampusId,
-          name: form.newCampusName.trim(),
-          fundingSource: form.newCampusFunding.trim() || 'Client Provided',
-          priority: form.newCampusPriority,
-        });
-        campusId = newCampusId;
+        if (isAdminProfile) {
+          const newProperty = await propertyService.createProperty({
+            name: form.newPropertyName.trim() as PropertyRecord['name'],
+            address: form.locationNotes || 'Address TBD',
+            funding_source: form.newPropertyFunding.trim() || 'Client Provided',
+            is_historic: form.newPropertyPriority === 'Critical',
+            priority: form.newPropertyPriority,
+          });
+          propertyId = newProperty.id;
+          setProperties((prev) => [...prev, mapPropertyOption(newProperty)]);
+        } else {
+          const newPropertyId = `property-${form.newPropertyName.trim().toLowerCase().replace(/\s+/g, '-')}-${Date.now().toString(36)}`;
+          setProperties((prev) => [
+            ...prev,
+            {
+              id: newPropertyId,
+              name: form.newPropertyName.trim(),
+              fundingSource: form.newPropertyFunding.trim() || 'Client Provided',
+              priority: form.newPropertyPriority,
+            },
+          ]);
+          propertyId = newPropertyId;
+        }
       }
-      let siteId = mockSites.find((site) => site.campusId === campusId)?.id;
-      if (!siteId) {
-        const newSiteId = `site-${Date.now().toString(36)}`;
-        mockSites.push({
-          id: newSiteId,
-          campusId,
+      if (!propertyId) {
+        toast.error('Select a property');
+        return;
+      }
+      let siteId = '';
+      if (isAdminProfile) {
+        const site = await siteService.ensureDefaultForProperty(propertyId, {
           name: form.locationNotes || `${form.name} Site`,
           address: form.locationNotes || 'Address TBD',
-          isHistoric: false,
         });
-        siteId = newSiteId;
+        siteId = site.id;
+      } else {
+        let site = mockSites.find((entry) => entry.propertyId === propertyId);
+        if (!site) {
+          site = {
+            id: `site-${Date.now().toString(36)}`,
+            propertyId,
+            name: form.locationNotes || `${form.name} Site`,
+            address: form.locationNotes || 'Address TBD',
+            isHistoric: false,
+          };
+          mockSites.push(site);
+        }
+        siteId = site.id;
       }
-      const finalClientName = form.clientMode === 'existing' ? (form.existingClient || form.clientName) : form.clientName;
-      const finalClientEmail = form.clientMode === 'existing' && form.existingClient && !form.clientEmail
-        ? mockContacts.find((c) => c.company === form.existingClient)?.email || form.clientEmail
-        : form.clientEmail;
-      const finalClientPhone = form.clientMode === 'existing' && form.existingClient && !form.clientPhone
-        ? mockContacts.find((c) => c.company === form.existingClient)?.phone || form.clientPhone
-        : form.clientPhone;
+      const selectedLead = form.leadId ? leads.find((lead) => lead.id === form.leadId) : undefined;
+      const existingContact = form.existingClient ? contacts.find((contact) => contact.company === form.existingClient) : undefined;
+      const finalClientName =
+        form.clientMode === 'existing'
+          ? form.existingClient || existingContact?.name || form.clientName
+          : form.clientName || (selectedLead as any)?.company_name || (selectedLead as any)?.companyName || '';
+      const finalClientEmail =
+        form.clientMode === 'existing' && form.existingClient && !form.clientEmail
+          ? existingContact?.email || form.clientEmail
+          : form.clientEmail;
+      const finalClientPhone =
+        form.clientMode === 'existing' && form.existingClient && !form.clientPhone
+          ? existingContact?.phone || form.clientPhone
+          : form.clientPhone;
       const plan = projectPlan;
       const editedQuestions = planEdits?.questions?.map((question) => question.trim()).filter((question) => question.length > 0);
       const planQuestions = editedQuestions && editedQuestions.length > 0 ? editedQuestions : plan?.questions || [];
@@ -481,12 +598,12 @@ const [form, setForm] = useState({
       const walkthroughPrepTasks = walkthroughTasks.length > 0 ? walkthroughTasks : [];
       const payload = {
         name: form.name,
-        campusId,
+        propertyId,
         siteId,
-        clientName: finalClientName || mockLeads.find((l) => l.id === form.leadId)?.companyName || '',
-        clientEmail: finalClientEmail,
-        clientPhone: finalClientPhone,
-        internalOwnerId: mockUsers[0]?.id || 'user-1',
+        clientName: finalClientName || (selectedLead as any)?.company_name || (selectedLead as any)?.companyName || '',
+        clientEmail: finalClientEmail || selectedLead?.email || '',
+        clientPhone: finalClientPhone || selectedLead?.phone || '',
+        internalOwnerId: user?.id || 'user-1',
         primeVendorId: 'vendor-1',
         status: 'Planning' as Project['status'],
         clientVisibility: { showBudget: true, showTimeline: true, showInvoices: true, showContacts: true },
@@ -522,11 +639,10 @@ const [form, setForm] = useState({
         });
       }
       setProjects((prev) => [...prev, project]);
-      setSelectedProjectId(project.id);
       setShowModal(false);
       setForm({
         name: '',
-        campusId: campuses[0]?.id || '',
+        propertyId: properties[0]?.id || '',
         locationNotes: '',
         clientName: '',
         clientEmail: '',
@@ -538,10 +654,10 @@ const [form, setForm] = useState({
         contactId: '',
         clientMode: 'existing',
         existingClient: '',
-        campusMode: 'existing',
-        newCampusName: '',
-        newCampusFunding: '',
-        newCampusPriority: 'Medium',
+        propertyMode: 'existing',
+        newPropertyName: '',
+        newPropertyFunding: '',
+        newPropertyPriority: 'Medium',
         scopeNotes: '',
         templateType: 'default',
       });
@@ -556,292 +672,174 @@ const [form, setForm] = useState({
   if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[70vh]">
-        <Loader2 className="w-8 h-8 animate-spin text-[#143352]" />
+        <Loader2 className="w-8 h-8 animate-spin text-[#0f2749]" />
       </div>
     );
   }
 
   return (
-    <div className="flex gap-6">
-      <aside className="w-64 bg-white border border-neutral-200 p-4 space-y-4 hidden lg:block">
-        <div className="flex items-center justify-between">
-          <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Clients</p>
-          <button onClick={() => setShowModal(true)} className="text-sm text-[#143352] flex items-center gap-1">
-            <Plus className="w-4 h-4" />
-            New
-          </button>
+    <div className="space-y-8">
+      <header className="flex flex-wrap items-center justify-between gap-4 mb-6">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Operations</p>
+          <h1 className="text-3xl font-heading font-semibold text-[var(--text-body)]">Jobs</h1>
+          <p className="text-sm text-[var(--text-muted)]">Live job tracker</p>
         </div>
-        <div className="space-y-3">
-          {groupedByClient.map(([clientName, clientProjects]) => {
-            const isExpanded = expandedClients.has(clientName);
-            return (
-              <div key={clientName} className="border border-neutral-200">
-                <button
-                  onClick={() =>
-                    setExpandedClients((prev) => {
-                      const next = new Set(prev);
-                      if (next.has(clientName)) {
-                        next.delete(clientName);
-                      } else {
-                        next.add(clientName);
-                      }
-                      return next;
-                    })
-                  }
-                  className="w-full flex items-center justify-between px-3 py-2 bg-neutral-50"
-                >
-                  <div className="text-left">
-                    <p className="text-xs font-semibold text-neutral-600 uppercase">{clientName}</p>
-                    <p className="text-xs text-neutral-400">{clientProjects.length} projects</p>
-                  </div>
-                  <ChevronDown className={`w-4 h-4 text-neutral-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
-                </button>
-                {isExpanded && (
-                  <div className="space-y-1 px-3 pb-2">
-                    {clientProjects.map((project) => (
-                      <button
-                        key={project.id}
-                        onClick={() => setSelectedProjectId(project.id)}
-                        className={`w-full text-left px-2 py-1 border border-neutral-200 text-sm truncate ${
-                          project.id === selectedProjectId ? 'bg-[#143352] text-white' : 'bg-white text-neutral-700'
-                        }`}
-                      >
-                        {project.name}
-                        <span className="block text-xs text-neutral-500">
-                          {campuses.find((c) => c.id === project.campusId)?.name || 'Campus TBD'}
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </aside>
+        <button
+          onClick={() => setShowModal(true)}
+          disabled={supportingDataLoading}
+          className="btn-primary inline-flex items-center gap-2 text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {supportingDataLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />} New Job
+        </button>
+      </header>
 
-      <div className="flex-1 space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="text-xs uppercase tracking-[0.3em] text-neutral-500">Portfolio</p>
-            <h1 className="text-3xl font-heading font-bold text-neutral-900">Pelican State Projects</h1>
-          </div>
-          <div className="flex items-center gap-3">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 w-4 h-4 text-neutral-400" />
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search projects or clients"
-                className="pl-10 pr-4 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#143352]"
-              />
+      <section className="space-y-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-5 gap-4">
+          {[
+            { label: 'Ending within 30 days', value: summarySnapshot.endingWithin, accent: 'border-amber-200 bg-amber-50 text-amber-700' },
+            { label: 'Late', value: summarySnapshot.late, accent: 'border-red-200 bg-red-50 text-red-700' },
+            { label: 'Requires invoicing', value: summarySnapshot.requiresInvoicing, accent: 'border-emerald-200 bg-emerald-50 text-emerald-700' },
+            { label: 'Action required', value: summarySnapshot.actionRequired, accent: 'border-orange-200 bg-orange-50 text-orange-700' },
+            { label: 'Unscheduled', value: summarySnapshot.unscheduled, accent: 'border-slate-200 bg-slate-50 text-slate-700' },
+          ].map((card) => (
+            <div key={card.label} className={`p-4 border ${card.accent} rounded-3xl`}> 
+              <p className="text-xs uppercase tracking-[0.2em] text-[var(--text-muted)]">{card.label}</p>
+              <p className="text-3xl font-heading font-semibold mt-2">{card.value}</p>
+              <p className="text-xs text-[var(--text-muted)]">Jobs</p>
             </div>
-            <select
-              value={campusFilter}
-              onChange={(e) => setCampusFilter(e.target.value)}
-              className="px-3 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#143352]"
-            >
-              <option value="">All Campuses</option>
-              {campuses.map((campus) => (
-                <option key={campus.id} value={campus.id}>
-                  {campus.name}
-                </option>
-              ))}
-            </select>
-            <button
-              onClick={() => setShowModal(true)}
-              className="inline-flex items-center gap-2 bg-[#143352] text-white px-4 py-2"
-            >
-              <Plus className="w-4 h-4" /> Add Project
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="card p-5 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--text-muted)]">Recent visits (30 days)</p>
+              <h3 className="text-2xl font-heading">{visitStats.recentCount}</h3>
+              <p className="text-xs text-[var(--text-muted)]">{formatCurrency(visitStats.recentValue)} in progress</p>
+            </div>
+            <div className="text-xs text-[var(--brand-primary)] font-semibold">On track</div>
+          </div>
+          <div className="card p-5 flex items-center justify-between">
+            <div>
+              <p className="text-sm text-[var(--text-muted)]">Visits scheduled</p>
+              <h3 className="text-2xl font-heading">{visitStats.scheduledCount}</h3>
+              <p className="text-xs text-[var(--text-muted)]">{formatCurrency(visitStats.scheduledValue)} booked</p>
+            </div>
+            <div className="text-xs text-red-600 font-semibold">{visitStats.scheduledCount === 0 ? 'Need bookings' : 'Scheduled'}</div>
+          </div>
+          <div className="card p-5 bg-gradient-to-br from-[#fef3c7] to-white border-amber-100">
+            <p className="text-sm text-amber-800 font-semibold">How can you win more work?</p>
+            <p className="text-xs text-amber-900 mt-2 leading-relaxed">Add visits to late jobs and let Pelican Assist keep clients in the loop.</p>
+            <button className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[var(--brand-primary)]">
+              Learn more with Pelican Assist →
             </button>
           </div>
         </div>
 
-        {selectedProject ? (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-white border border-neutral-200 p-5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-neutral-900">Client Info</p>
-                  <span className="px-2 py-1 text-xs bg-neutral-100 text-neutral-600">{selectedProject.status}</span>
-                </div>
-                <div className="space-y-2 text-sm text-neutral-600">
-                  <p className="font-semibold text-neutral-900">{selectedProject.clientName}</p>
-                  <p className="flex items-center gap-2"><Phone className="w-4 h-4 text-[#143352]" />{selectedProject.clientPhone}</p>
-                  <p className="flex items-center gap-2"><Mail className="w-4 h-4 text-[#143352]" />{selectedProject.clientEmail}</p>
-                  <p className="flex items-center gap-2"><MapPin className="w-4 h-4 text-[#143352]" />{selectedProject.clientSummary}</p>
-                </div>
-              </div>
-              <div className="bg-white border border-neutral-200 p-5 flex flex-col items-center justify-center">
-                <p className="text-sm font-semibold text-neutral-900 mb-2">Project Progress</p>
-                <div
-                  className="w-44 h-44 rounded-full flex items-center justify-center"
-                  style={{
-                    background: `conic-gradient(#27AE60 0% ${Math.min(
-                      100,
-                      Math.round((selectedProject.spentBudget / selectedProject.totalBudget) * 100)
-                    )}%, #E5E7EB ${Math.min(
-                      100,
-                      Math.round((selectedProject.spentBudget / selectedProject.totalBudget) * 100)
-                    )}% 100%)`,
-                  }}
+        <div className="card overflow-hidden">
+          <div className="px-6 py-4 border-b border-[var(--border-subtle)]">
+            <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Jobs</p>
+            <h2 className="text-xl font-heading font-semibold text-[var(--text-body)]">Live Job Tracker</h2>
+          </div>
+          <div className="flex flex-wrap items-center gap-3 px-6 py-4 border-b border-[var(--border-subtle)]">
+            <div className="relative w-full md:w-72">
+              <Search className="absolute left-3 top-3 w-4 h-4 text-[var(--text-muted)]" />
+              <input
+                value={boardSearch}
+                onChange={(e) => setBoardSearch(e.target.value)}
+                placeholder="Search jobs or clients"
+                className="w-full pl-10 pr-4 py-2 border rounded-full"
+              />
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {boardStatusOptions.map((status) => (
+                <button
+                  key={status}
+                  onClick={() => setJobStatusFilter(status)}
+                  className={`px-3 py-1 text-xs font-medium rounded-full border ${
+                    jobStatusFilter === status ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]' : 'text-[var(--text-muted)]'
+                  }`}
                 >
-                  <div className="w-32 h-32 bg-white rounded-full flex flex-col items-center justify-center">
-                    <span className="text-4xl font-heading font-semibold text-neutral-900">
-                      {Math.round((selectedProject.spentBudget / selectedProject.totalBudget) * 100)}%
-                    </span>
-                    <span className="text-xs text-neutral-500">Budget consumed</span>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white border border-neutral-200 p-5">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold text-neutral-900">Cost Performance Index</p>
-                  <button className="text-xs text-neutral-500 flex items-center gap-1">
-                    <Filter className="w-3 h-3" /> Filter
-                  </button>
-                </div>
-                <div className="mt-6 space-y-3">
-                  {[60, 75, 40, 90].map((value, idx) => (
-                    <div key={idx} className="flex items-center gap-3">
-                      <span className="text-xs text-neutral-500">Q{idx + 1}</span>
-                      <div className="flex-1 h-8 bg-neutral-100 rounded-full overflow-hidden">
-                        <div className="h-full bg-[#143352]" style={{ width: `${value}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              <div className="bg-white border border-neutral-200 p-5 space-y-3">
-                <p className="text-sm font-semibold text-neutral-900">Project Status</p>
-                <div className="flex flex-col gap-3">
-                  <div>
-                    <p className="text-xs uppercase text-neutral-500">Budget</p>
-                    <div className="flex justify-between text-sm text-neutral-600">
-                      <span>Total</span>
-                      <span>{formatCurrency(selectedProject.totalBudget)}</span>
-                    </div>
-                    <div className="flex justify-between text-sm text-neutral-600">
-                      <span>Spent</span>
-                      <span>{formatCurrency(selectedProject.spentBudget)}</span>
-                    </div>
-                    <div className="mt-2 h-2 bg-neutral-100 rounded-full">
-                      <div
-                        className="h-full bg-amber-500 rounded-full"
-                        style={{ width: `${Math.min(100, Math.round((selectedProject.spentBudget / selectedProject.totalBudget) * 100))}%` }}
-                      />
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs uppercase text-neutral-500">Start Date</p>
-                      <p className="text-sm text-neutral-900">{selectedProject.startDate}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase text-neutral-500">End Date</p>
-                      <p className="text-sm text-neutral-900">{selectedProject.endDate}</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="bg-white border border-neutral-200 p-5 space-y-3">
-                <p className="text-sm font-semibold text-neutral-900">Safety Metrics</p>
-                <div className="flex items-center gap-6">
-                  <div className="w-28 h-28 rounded-full" style={{ background: 'conic-gradient(#F04040 0% 25%, #F4B400 25% 55%, #27AE60 55% 100%)' }}>
-                    <div className="w-20 h-20 bg-white rounded-full mx-auto my-4 flex flex-col items-center justify-center">
-                      <span className="text-2xl font-heading text-red-500">12</span>
-                      <span className="text-xs text-neutral-500">This Month</span>
-                    </div>
-                  </div>
-                  <div className="flex-1 grid grid-cols-2 gap-3 text-sm">
-                    {[
-                      { label: 'Low Risk', value: 12 },
-                      { label: 'Medium', value: 23 },
-                      { label: 'Moderate', value: 2 },
-                      { label: 'High', value: 4 },
-                    ].map((item) => (
-                      <div key={item.label} className="border border-neutral-200 p-2 text-center">
-                        <p className="text-xs text-neutral-500">{item.label}</p>
-                        <p className="text-lg font-semibold text-neutral-900">{item.value}</p>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-white border border-neutral-200">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-200">
-                <div>
-                  <p className="text-lg font-heading font-semibold text-neutral-900">Projects</p>
-                  <p className="text-sm text-neutral-500">All projects for {selectedProject.clientName}</p>
-                </div>
-                <button className="text-sm text-neutral-500 flex items-center gap-1">
-                  <Filter className="w-4 h-4" /> Filter
+                  {status}
                 </button>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="min-w-full">
-                  <thead className="text-xs uppercase text-neutral-500">
-                    <tr>
-                      <th className="text-left px-6 py-3">Project</th>
-                      <th className="text-left px-6 py-3">Campus</th>
-                      <th className="text-left px-6 py-3">Status</th>
-                <th className="text-right px-6 py-3">Budget</th>
-                <th className="text-right px-6 py-3">Active Tasks</th>
-                <th className="text-right px-6 py-3">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="text-sm text-neutral-700">
-              {selectedClientProjects.map((projectRow) => {
-                const activeTasks = projectTaskService
-                        .getByProject(projectRow.id)
-                        .filter((task) => !['Completed', 'Closed', 'Paid', 'Invoiced'].includes(task.status)).length;
-                return (
+              ))}
+            </div>
+            <select
+              value={boardPropertyFilter}
+              onChange={(e) => setBoardPropertyFilter(e.target.value)}
+              className="px-3 py-2 border rounded-full text-sm"
+            >
+              <option value="">All Properties</option>
+              {properties.map((property) => (
+                <option key={property.id} value={property.id}>
+                  {property.name}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[720px] text-sm">
+              <thead className="text-xs uppercase text-[var(--text-muted)]">
+                <tr>
+                  <th className="text-left px-6 py-3">Job</th>
+                  <th className="text-left px-6 py-3">Client</th>
+                  <th className="text-left px-6 py-3">Property</th>
+                  <th className="text-left px-6 py-3">Status</th>
+                  <th className="text-left px-6 py-3">Schedule</th>
+                  <th className="text-right px-6 py-3">Total</th>
+                  <th className="text-right px-6 py-3">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="text-neutral-700">
+                {boardProjects.map((project) => (
                   <tr
-                    key={projectRow.id}
-                    className="border-t border-neutral-100 hover:bg-neutral-50 cursor-pointer"
-                    onClick={() => {
-                      setSelectedProjectId(projectRow.id);
-                      navigate(`/projects/${projectRow.id}`);
-                    }}
+                    key={project.id}
+                    className="border-t border-[var(--border-subtle)] hover:bg-[var(--brand-sand)] cursor-pointer"
+                    onClick={() => navigate(`/projects/${project.id}`)}
                   >
-                          <td className="px-6 py-3 font-medium text-neutral-900">
-                            <div>
-                              <p>{projectRow.name}</p>
-                              <p className="text-xs text-neutral-500 truncate">{projectRow.clientSummary}</p>
-                            </div>
-                          </td>
-                          <td className="px-6 py-3 text-neutral-600">{campuses.find((c) => c.id === projectRow.campusId)?.name || 'Campus TBD'}</td>
-                          <td className="px-6 py-3">
-                            <span className={`text-xs px-2 py-0.5 font-medium ${projectRow.status === 'Active' ? 'bg-green-100 text-green-700' : 'bg-neutral-100 text-neutral-700'}`}>
-                              {projectRow.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-3 text-right text-neutral-900">{formatCurrency(projectRow.totalBudget)}</td>
-                    <td className="px-6 py-3 text-right text-neutral-600">{activeTasks}</td>
-                    <td className="px-6 py-3 text-right text-neutral-600">
-                      <span className="inline-flex items-center gap-1 text-[#143352] text-xs font-semibold">
-                        View <ArrowRight className="w-3 h-3" />
-                      </span>
+                    <td className="px-6 py-3 font-medium text-[var(--text-body)]">
+                      <p>{project.name}</p>
+                      <p className="text-xs text-[var(--text-muted)] truncate">{project.client_summary || 'No summary yet'}</p>
+                    </td>
+                    <td className="px-6 py-3 text-[var(--text-muted)]">{project.client_name}</td>
+                    <td className="px-6 py-3 text-[var(--text-muted)]">
+                      {properties.find((c) => c.id === project.property_id)?.name || 'Property TBD'}
+                    </td>
+                    <td className="px-6 py-3">
+                      <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusClass(project.status)}`}>{project.status}</span>
+                    </td>
+                    <td className="px-6 py-3 text-[var(--text-muted)]">
+                      {project.start_date} → {project.end_date}
+                    </td>
+                    <td className="px-6 py-3 text-right text-[var(--text-body)]">{formatCurrency(project.total_budget)}</td>
+                    <td className="px-6 py-3 text-right">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/projects/${project.id}`);
+                        }}
+                        className="text-sm text-[var(--brand-primary)] hover:underline"
+                      >
+                        Open
+                      </button>
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-              </div>
-            </div>
+                ))}
+                {boardProjects.length === 0 && (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-6 text-center text-[var(--text-muted)]">
+                      No jobs match the current filters.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
-        ) : (
-          <div className="bg-white border border-neutral-200 p-10 text-center text-neutral-500">
-            Select a project to view details.
-          </div>
-        )}
-      </div>
+        </div>
+      </section>
+
+      
 
       {showModal && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center z-50">
@@ -880,27 +878,27 @@ const [form, setForm] = useState({
               <input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required placeholder="Project Name" className="border border-neutral-300 px-3 py-2" />
               <div className="md:col-span-2 flex items-center gap-4 text-sm text-neutral-600">
                 <label className="flex items-center gap-2">
-                  <input type="radio" name="campusMode" value="existing" checked={form.campusMode === 'existing'} onChange={(e) => setForm({ ...form, campusMode: e.target.value as 'existing' | 'new' })} />
-                  Existing Campus
+                  <input type="radio" name="propertyMode" value="existing" checked={form.propertyMode === 'existing'} onChange={(e) => setForm({ ...form, propertyMode: e.target.value as 'existing' | 'new' })} />
+                  Existing Property
                 </label>
                 <label className="flex items-center gap-2">
-                  <input type="radio" name="campusMode" value="new" checked={form.campusMode === 'new'} onChange={(e) => setForm({ ...form, campusMode: e.target.value as 'existing' | 'new' })} />
-                  Add New Campus
+                  <input type="radio" name="propertyMode" value="new" checked={form.propertyMode === 'new'} onChange={(e) => setForm({ ...form, propertyMode: e.target.value as 'existing' | 'new' })} />
+                  Add New Property
                 </label>
               </div>
-              {form.campusMode === 'existing' ? (
-                <select value={form.campusId} onChange={(e) => setForm({ ...form, campusId: e.target.value })} className="border border-neutral-300 px-3 py-2">
-                  {campuses.map((campus) => (
-                    <option key={campus.id} value={campus.id}>
-                      {campus.name}
+              {form.propertyMode === 'existing' ? (
+                <select value={form.propertyId} onChange={(e) => setForm({ ...form, propertyId: e.target.value })} className="border border-neutral-300 px-3 py-2">
+                  {properties.map((property) => (
+                    <option key={property.id} value={property.id}>
+                      {property.name}
                     </option>
                   ))}
                 </select>
               ) : (
-                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
-                  <input value={form.newCampusName} onChange={(e) => setForm({ ...form, newCampusName: e.target.value })} placeholder="Campus Name" className="border border-neutral-300 px-3 py-2" />
-                  <input value={form.newCampusFunding} onChange={(e) => setForm({ ...form, newCampusFunding: e.target.value })} placeholder="Funding Source" className="border border-neutral-300 px-3 py-2" />
-                  <select value={form.newCampusPriority} onChange={(e) => setForm({ ...form, newCampusPriority: e.target.value as Priority })} className="border border-neutral-300 px-3 py-2">
+                 <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
+                   <input value={form.newPropertyName} onChange={(e) => setForm({ ...form, newPropertyName: e.target.value })} placeholder="Property Name" className="border border-neutral-300 px-3 py-2" />
+                  <input value={form.newPropertyFunding} onChange={(e) => setForm({ ...form, newPropertyFunding: e.target.value })} placeholder="Funding Source" className="border border-neutral-300 px-3 py-2" />
+                  <select value={form.newPropertyPriority} onChange={(e) => setForm({ ...form, newPropertyPriority: e.target.value as Priority })} className="border border-neutral-300 px-3 py-2">
                     {(['Critical', 'High', 'Medium', 'Low'] as Priority[]).map((priority) => (
                       <option key={priority} value={priority}>
                         {priority}
@@ -952,7 +950,7 @@ const [form, setForm] = useState({
                 <div className="md:col-span-2 bg-neutral-50 border border-dashed border-neutral-200 p-3 text-xs text-neutral-600 space-y-1">
                   <p className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
                     {selectedTemplateMeta.name}
-                    <span className="text-[10px] uppercase tracking-[0.3em] text-[#143352] bg-white border border-[#143352]/20 px-2 py-0.5">{selectedTemplateMeta.category}</span>
+                    <span className="text-[10px] uppercase tracking-[0.3em] text-[#0f2749] bg-white border border-[#0f2749]/20 px-2 py-0.5">{selectedTemplateMeta.category}</span>
                   </p>
                   <p>{selectedTemplateMeta.description}</p>
                   <p className="text-[11px] text-neutral-500">Cost guidance: {selectedTemplateMeta.costHeuristic}</p>
@@ -975,7 +973,7 @@ const [form, setForm] = useState({
                       <p className="text-xs text-neutral-500">{projectPlan.description}</p>
                       <p className="text-[11px] text-neutral-500 mt-1">{projectPlan.costHeuristic}</p>
                     </div>
-                    <button type="button" onClick={handleRegeneratePlan} className="inline-flex items-center gap-2 text-xs text-[#143352] border border-[#143352] px-3 py-1 uppercase tracking-wide">
+                    <button type="button" onClick={handleRegeneratePlan} className="inline-flex items-center gap-2 text-xs text-[#0f2749] border border-[#0f2749] px-3 py-1 uppercase tracking-wide">
                       <RefreshCcw className="w-3.5 h-3.5" /> Regenerate Plan
                     </button>
                   </div>
@@ -1044,15 +1042,15 @@ const [form, setForm] = useState({
               <input type="number" value={form.totalBudget} onChange={(e) => setForm({ ...form, totalBudget: Number(e.target.value) })} placeholder="Budget" className="border border-neutral-300 px-3 py-2" />
               <select value={form.leadId} onChange={(e) => setForm({ ...form, leadId: e.target.value })} className="border border-neutral-300 px-3 py-2">
                 <option value="">Attach Lead (optional)</option>
-                {mockLeads.map((lead) => (
+                {leads.map((lead) => (
                   <option key={lead.id} value={lead.id}>
-                    {lead.companyName}
+                    {(lead as any).company_name ?? (lead as any).companyName}
                   </option>
                 ))}
               </select>
               <select value={form.contactId} onChange={(e) => setForm({ ...form, contactId: e.target.value })} className="border border-neutral-300 px-3 py-2">
                 <option value="">Attach Contact (optional)</option>
-                {mockContacts.map((contact) => (
+                {contacts.map((contact) => (
                   <option key={contact.id} value={contact.id}>
                     {contact.name}
                   </option>
@@ -1064,7 +1062,7 @@ const [form, setForm] = useState({
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 border border-neutral-300 text-neutral-600">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-2 bg-[#143352] text-white">
+                <button type="submit" className="px-4 py-2 bg-[#0f2749] text-white">
                   Create Project
                 </button>
               </div>

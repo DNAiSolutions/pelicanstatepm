@@ -17,7 +17,7 @@ export function WorkRequestQuotes({
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-xl font-heading font-bold text-neutral-900">Quotes & Estimates</h2>
+        <h2 className="text-xl font-heading font-bold text-neutral-900">Quotes</h2>
         <button onClick={onNewQuoteClick} className="btn-primary text-sm">
           New Quote
         </button>

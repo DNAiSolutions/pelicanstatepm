@@ -1,19 +1,19 @@
 import { Search, Plus } from 'lucide-react';
-import { mockCampuses } from '../../data/pipeline';
+import { mockProperties } from '../../data/pipeline';
 
 interface ProjectFiltersBarProps {
   search: string;
   onSearchChange: (value: string) => void;
-  campusFilter: string;
-  onCampusFilterChange: (value: string) => void;
+  propertyFilter: string;
+  onPropertyFilterChange: (value: string) => void;
   onNewProjectClick: () => void;
 }
 
 export function ProjectFiltersBar({
   search,
   onSearchChange,
-  campusFilter,
-  onCampusFilterChange,
+  propertyFilter,
+  onPropertyFilterChange,
   onNewProjectClick,
 }: ProjectFiltersBarProps) {
   return (
@@ -31,24 +31,24 @@ export function ProjectFiltersBar({
             value={search}
             onChange={(e) => onSearchChange(e.target.value)}
             placeholder="Search projects or clients"
-            className="pl-10 pr-4 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#143352]"
+            className="pl-10 pr-4 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0f2749]"
           />
         </div>
         <select
-          value={campusFilter}
-          onChange={(e) => onCampusFilterChange(e.target.value)}
-          className="px-3 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#143352]"
+          value={propertyFilter}
+          onChange={(e) => onPropertyFilterChange(e.target.value)}
+          className="px-3 py-2 border border-neutral-300 bg-white focus:outline-none focus:ring-2 focus:ring-[#0f2749]"
         >
-          <option value="">All Campuses</option>
-          {mockCampuses.map((campus) => (
-            <option key={campus.id} value={campus.id}>
-              {campus.name}
+          <option value="">All Properties</option>
+          {mockProperties.map((property) => (
+            <option key={property.id} value={property.id}>
+              {property.name}
             </option>
           ))}
         </select>
         <button
           onClick={onNewProjectClick}
-          className="inline-flex items-center gap-2 bg-[#143352] text-white px-4 py-2"
+          className="inline-flex items-center gap-2 bg-[#0f2749] text-white px-4 py-2"
         >
           <Plus className="w-4 h-4" /> Add Project
         </button>

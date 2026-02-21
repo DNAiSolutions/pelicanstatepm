@@ -1,5 +1,5 @@
 import { Plus } from 'lucide-react';
-import type { Lead } from '../../data/pipeline';
+import type { Lead } from '../../types';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value);
@@ -21,7 +21,7 @@ export function ProjectLeads({ leads, onAddLead, onLeadClick }: ProjectLeadsProp
         {onAddLead && (
           <button
             onClick={onAddLead}
-            className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-[#143352] rounded-lg hover:bg-[#143352]/90 transition-colors"
+            className="flex items-center gap-2 px-3 py-2 text-sm text-white bg-[#0f2749] rounded-lg hover:bg-[#0f2749]/90 transition-colors"
           >
             <Plus className="w-4 h-4" />
             Add Lead
@@ -41,12 +41,12 @@ export function ProjectLeads({ leads, onAddLead, onLeadClick }: ProjectLeadsProp
             >
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-neutral-900">{lead.companyName}</p>
+                  <p className="font-medium text-neutral-900">{lead.company_name}</p>
                   <p className="text-xs text-neutral-500">Stage: {lead.stage}</p>
                 </div>
-                <span className="text-sm font-semibold text-neutral-900">{formatCurrency(lead.estimatedValue)}</span>
+                <span className="text-sm font-semibold text-neutral-900">{formatCurrency(lead.estimated_value ?? 0)}</span>
               </div>
-              <p className="text-sm text-neutral-600 mt-2">Next: {lead.nextStep || 'TBD'}</p>
+              <p className="text-sm text-neutral-600 mt-2">Next: {lead.recommended_next_step || 'TBD'}</p>
             </div>
           ))}
         </div>

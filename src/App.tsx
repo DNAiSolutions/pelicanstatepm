@@ -19,14 +19,18 @@ import { ProjectDetailPage } from './pages/ProjectDetailPage';
 import { ProjectClientViewPage } from './pages/ProjectClientViewPage';
 import { LeadsPage } from './pages/LeadsPage';
 import { ContactsPage } from './pages/ContactsPage';
-import { EstimatesListPage } from './pages/EstimatesListPage';
+import { QuotesListPage } from './pages/QuotesListPage';
+import { QuoteDetailPage } from './pages/QuoteDetailPage';
 import { MainLayout } from './layouts/MainLayout';
 import { PortalLandingPage } from './pages/PortalLandingPage';
 import { PortalProjectsPage } from './pages/PortalProjectsPage';
 import { PortalProjectDetailPage } from './pages/PortalProjectDetailPage';
+import { PortalRequestsPage } from './pages/PortalRequestsPage';
+import { PortalRequestFormPage } from './pages/PortalRequestFormPage';
 import { WalkthroughSessionPage } from './pages/WalkthroughSessionPage';
 import { OnboardingPage } from './pages/OnboardingPage';
 import { MembersPage } from './pages/MembersPage';
+import { PropertiesPage } from './pages/PropertiesPage';
 
 function AppRoutes() {
   return (
@@ -64,6 +68,8 @@ function AppRoutes() {
         <Route path="/client-portal" element={<PortalLandingPage />} />
         <Route path="/client-portal/projects" element={<PortalProjectsPage />} />
         <Route path="/client-portal/projects/:projectId" element={<PortalProjectDetailPage />} />
+        <Route path="/client-portal/requests" element={<PortalRequestsPage />} />
+        <Route path="/client-portal/requests/new" element={<PortalRequestFormPage />} />
         <Route path="/walkthroughs/new/:leadId" element={<WalkthroughSessionPage />} />
 
         {/* Work Requests */}
@@ -71,15 +77,18 @@ function AppRoutes() {
         <Route path="/work-requests/new" element={<WorkRequestIntakePage />} />
         <Route path="/work-requests/:id" element={<WorkRequestDetailPage />} />
         
-        {/* Estimates */}
-        <Route path="/estimates" element={<EstimatesListPage />} />
-        <Route path="/estimates/new/:id" element={<EstimateNewPage />} />
+        {/* Quotes */}
+        <Route path="/quotes" element={<QuotesListPage />} />
+        <Route path="/quotes/:quoteId" element={<QuoteDetailPage />} />
+        <Route path="/quotes/new" element={<EstimateNewPage />} />
+        <Route path="/quotes/new/:id" element={<EstimateNewPage />} />
         
         {/* Invoices */}
         <Route path="/invoices" element={<InvoiceListPage />} />
         <Route path="/invoices/new" element={<InvoiceBuilderPage />} />
         <Route path="/leads" element={<LeadsPage />} />
         <Route path="/contacts" element={<ContactsPage />} />
+        <Route path="/properties" element={<PropertiesPage />} />
         <Route path="/walkthroughs" element={<SiteWalkthroughPage />} />
         <Route path="/historic-documentation" element={<HistoricDocumentationPage />} />
         <Route path="/schedules" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Schedules (Coming Soon)</h1></div>} />

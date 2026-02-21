@@ -1,30 +1,29 @@
-import {
-  getInvoiceById,
-  mockPaymentSyncRecords,
-  type Invoice,
-} from '../data/pipeline';
+import { supabase } from './supabaseClient';
+import { invoiceService } from './invoiceService';
 import { billingGuardService } from './billingGuardService';
 import { stripeService } from './stripeService';
 import { quickbooksService } from './quickbooksService';
 import { auditLogService } from './auditLogService';
 import { authzService } from './authzService';
+import type { Invoice } from '../types';
 
-const createRecordId = () => `psr-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+type SyncStatus = 'Pending' | 'Synced' | 'Failed';
 
 export const paymentSyncService = {
   async syncInvoiceToStripe(invoiceId: string, actingUserId: string) {
     authzService.assertCanSyncInvoice(actingUserId);
-    const invoice = this.getInvoiceOrThrow(invoiceId);
-    const guard = billingGuardService.evaluateInvoice(invoice);
-    if (!guard.allowed) {
-      throw new Error(guard.reasons.join('; '));
-    }
-    const intent = await stripeService.createPaymentIntent(invoice.id, invoice.totalAmount, 'usd', { projectId: invoice.projectId });
-    invoice.stripePaymentIntentId = intent.id;
-    this.trackSyncRecord(invoice, 'Stripe', 'Synced', intent.id, { amount: invoice.totalAmount });
+    const invoice = await this.getInvoiceOrThrow(invoiceId);
+    const guard = await billingGuardService.evaluateInvoice(invoice);
+    if (!guard.allowed) throw new Error(guard.reasons.join('; '));
+
+    const intent = await stripeService.createPaymentIntent(invoice.id!, invoice.total_amount, 'usd', {
+      projectId: invoice.project_id,
+    });
+    await invoiceService.update(invoice.id!, { stripe_payment_intent_id: intent.id } as any);
+    await this.trackSyncRecord(invoice.id!, 'Stripe', 'Synced', intent.id, { amount: invoice.total_amount });
     auditLogService.record({
       entity: 'Invoice',
-      entityId: invoice.id,
+      entityId: invoice.id!,
       action: 'SYNC_STRIPE',
       actorId: actingUserId,
       metadata: { intentId: intent.id },
@@ -34,13 +33,19 @@ export const paymentSyncService = {
 
   async syncInvoiceToQuickBooks(invoiceId: string, customerName: string, actingUserId: string) {
     authzService.assertCanSyncInvoice(actingUserId);
-    const invoice = this.getInvoiceOrThrow(invoiceId);
-    const record = await quickbooksService.pushInvoice(invoice.id, { customerName, amount: invoice.totalAmount });
-    invoice.quickbooksInvoiceId = record.id;
-    this.trackSyncRecord(invoice, 'QuickBooks', 'Synced', record.id, { customerName });
+    const invoice = await this.getInvoiceOrThrow(invoiceId);
+    const guard = await billingGuardService.evaluateInvoice(invoice);
+    if (!guard.allowed) throw new Error(guard.reasons.join('; '));
+
+    const record = await quickbooksService.pushInvoice(invoice.id!, {
+      customerName,
+      amount: invoice.total_amount,
+    });
+    await invoiceService.update(invoice.id!, { quickbooks_invoice_id: record.id } as any);
+    await this.trackSyncRecord(invoice.id!, 'QuickBooks', 'Synced', record.id, { customerName });
     auditLogService.record({
       entity: 'Invoice',
-      entityId: invoice.id,
+      entityId: invoice.id!,
       action: 'SYNC_QUICKBOOKS',
       actorId: actingUserId,
       metadata: { qboId: record.id },
@@ -50,62 +55,65 @@ export const paymentSyncService = {
 
   async recordStripeWebhook(event: { type: string; data: Record<string, any> }) {
     const intent = await stripeService.handleWebhook(event);
-    if (intent && intent.status === 'succeeded') {
-      const invoice = getInvoiceById(intent.invoiceId);
-      if (invoice) {
-        invoice.status = 'Paid';
-        invoice.paidAt = new Date().toISOString();
-        invoice.paymentMethod = 'Stripe';
-        invoice.paymentReference = intent.id;
-        this.trackSyncRecord(invoice, 'Stripe', 'Synced', intent.id, { webhook: true });
-        auditLogService.record({
-          entity: 'Payment',
-          entityId: intent.id,
-          action: 'STRIPE_WEBHOOK',
-          actorId: 'system-webhook',
-          metadata: { invoiceId: invoice.id },
-        });
-      }
+    if (intent?.status === 'succeeded') {
+      await invoiceService.update(intent.invoiceId, {
+        status: 'Paid',
+        paid_at: new Date().toISOString(),
+        payment_method: 'Stripe',
+      } as any);
+      await this.trackSyncRecord(intent.invoiceId, 'Stripe', 'Synced', intent.id, { webhook: true });
+      auditLogService.record({
+        entity: 'Payment',
+        entityId: intent.id,
+        action: 'STRIPE_WEBHOOK',
+        actorId: 'system-webhook',
+        metadata: { invoiceId: intent.invoiceId },
+      });
     }
     return intent;
   },
 
   async recordManualPayment(invoiceId: string, amount: number, actingUserId: string) {
     authzService.requireRole(actingUserId, ['Finance', 'Owner']);
-    const invoice = this.getInvoiceOrThrow(invoiceId);
-    await quickbooksService.recordPayment(invoice.id, amount);
-    invoice.status = 'Paid';
-    invoice.paidAt = new Date().toISOString();
-    invoice.paymentMethod = 'QuickBooks';
-    invoice.paymentReference = `QB-${Date.now()}`;
-    this.trackSyncRecord(invoice, 'QuickBooks', 'Synced', invoice.paymentReference, { amount });
+    const invoice = await this.getInvoiceOrThrow(invoiceId);
+    await quickbooksService.recordPayment(invoice.id!, amount);
+    await invoiceService.update(invoice.id!, {
+      status: 'Paid',
+      paid_at: new Date().toISOString(),
+      payment_method: 'QuickBooks',
+    } as any);
+    await this.trackSyncRecord(invoice.id!, 'QuickBooks', 'Synced', `QB-${Date.now()}`, { amount });
     auditLogService.record({
       entity: 'Payment',
-      entityId: invoice.id,
+      entityId: invoice.id!,
       action: 'QUICKBOOKS_PAYMENT',
       actorId: actingUserId,
       metadata: { amount },
     });
   },
 
-  trackSyncRecord(invoice: Invoice, provider: 'Stripe' | 'QuickBooks', status: 'Pending' | 'Synced' | 'Failed', reference?: string, payload?: Record<string, unknown>) {
-    mockPaymentSyncRecords.push({
-      id: createRecordId(),
-      invoiceId: invoice.id,
+  async trackSyncRecord(
+    invoiceId: string,
+    provider: 'Stripe' | 'QuickBooks',
+    status: SyncStatus,
+    reference?: string,
+    payload?: Record<string, unknown>
+  ) {
+    const { error } = await supabase.from('payment_sync_records').insert({
+      invoice_id: invoiceId,
       provider,
       status,
       reference,
       payload,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
     });
+    if (error) throw error;
   },
 
-  getInvoiceOrThrow(invoiceId: string): Invoice {
-    const invoice = getInvoiceById(invoiceId);
-    if (!invoice) {
-      throw new Error('Invoice not found');
-    }
+  async getInvoiceOrThrow(invoiceId: string): Promise<Invoice> {
+    const invoice = await invoiceService.getInvoice(invoiceId);
+    if (!invoice) throw new Error('Invoice not found');
     return invoice;
   },
 };
+
+export type PaymentSyncService = typeof paymentSyncService;

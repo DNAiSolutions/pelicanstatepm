@@ -1,27 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { invoiceService } from '../services/invoiceService';
-import { campusService, type Campus } from '../services/campusService';
+import { propertyService, type Property } from '../services/propertyService';
 import { pdfService } from '../services/pdfService';
 import { Plus, Download, Check, Search } from 'lucide-react';
 import toast from 'react-hot-toast';
-
-interface Invoice {
-  id: string;
-  invoice_number: string;
-  campus_id: string;
-  funding_source: string;
-  line_items: any[];
-  total_amount: number;
-  status: string;
-  submitted_at?: string;
-  created_at: string;
-}
+import type { Invoice } from '../types';
 
 export function InvoiceListPage() {
   const navigate = useNavigate();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
-  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>('');
@@ -34,12 +23,12 @@ export function InvoiceListPage() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [invoiceList, campusList] = await Promise.all([
+      const [invoiceList, propertyList] = await Promise.all([
         invoiceService.getInvoices({}),
-        campusService.getCampuses(),
+        propertyService.getProperties(),
       ]);
       setInvoices(invoiceList || []);
-      setCampuses(campusList);
+      setProperties(propertyList);
     } catch (error) {
       console.error('Failed to load:', error);
       toast.error('Failed to load invoices');
@@ -50,14 +39,14 @@ export function InvoiceListPage() {
 
   const filteredInvoices = invoices.filter((inv) => {
     const matchesSearch =
-      inv.invoice_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      inv.funding_source.toLowerCase().includes(searchTerm.toLowerCase());
+      (inv.invoice_number || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (inv.funding_code || '').toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = !selectedStatus || inv.status === selectedStatus;
     return matchesSearch && matchesStatus;
   });
 
-  const getCampusName = (campusId: string) => {
-    return campuses.find((c) => c.id === campusId)?.name || 'Unknown';
+  const getPropertyName = (propertyId: string) => {
+    return properties.find((c) => c.id === propertyId)?.name || 'Unknown';
   };
 
   const getStatusColor = (status: string) => {
@@ -73,7 +62,7 @@ export function InvoiceListPage() {
   const handleMarkPaid = async (invoiceId: string) => {
     try {
       setIsMarkingPaid(invoiceId);
-      await invoiceService.markAsPaid(invoiceId, 'check');
+      await invoiceService.processPayment(invoiceId, { method: 'Check', reference: `manual-${Date.now()}` });
       await loadData();
       toast.success('Invoice marked as paid');
     } catch (error) {
@@ -84,13 +73,13 @@ export function InvoiceListPage() {
     }
   };
 
-  const handleDownloadPDF = async (invoice: Invoice) => {
+    const handleDownloadPDF = async (invoice: Invoice) => {
     try {
       await pdfService.generateInvoicePDF(
         {
           invoice_number: invoice.invoice_number,
-          campus_name: getCampusName(invoice.campus_id),
-          funding_source: invoice.funding_source,
+          property_name: getPropertyName(invoice.property_id),
+          funding_source: invoice.funding_code,
           line_items: invoice.line_items,
           total_amount: invoice.total_amount,
         },
@@ -183,7 +172,7 @@ export function InvoiceListPage() {
               <thead className="bg-neutral-50 border-b border-neutral-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-sm font-medium text-neutral-900">Invoice #</th>
-                  <th className="px-6 py-3 text-left text-sm font-medium text-neutral-900">Campus</th>
+                  <th className="px-6 py-3 text-left text-sm font-medium text-neutral-900">Property</th>
                   <th className="px-6 py-3 text-left text-sm font-medium text-neutral-900">Funding Source</th>
                   <th className="px-6 py-3 text-left text-sm font-medium text-neutral-900">Status</th>
                   <th className="px-6 py-3 text-right text-sm font-medium text-neutral-900">Amount</th>
@@ -197,10 +186,10 @@ export function InvoiceListPage() {
                       {invoice.invoice_number}
                     </td>
                     <td className="px-6 py-3 text-sm text-neutral-600">
-                      {getCampusName(invoice.campus_id)}
+                      {getPropertyName(invoice.property_id)}
                     </td>
                     <td className="px-6 py-3 text-sm text-neutral-600">
-                      {invoice.funding_source}
+                      {invoice.funding_code}
                     </td>
                     <td className="px-6 py-3">
                       <span className={`inline-block px-3 py-1 text-xs font-medium ${getStatusColor(invoice.status)}`}>
@@ -221,8 +210,8 @@ export function InvoiceListPage() {
                         </button>
                         {invoice.status !== 'Paid' && (
                           <button
-                            onClick={() => handleMarkPaid(invoice.id)}
-                            disabled={isMarkingPaid === invoice.id}
+                            onClick={() => handleMarkPaid(invoice.id!)}
+                            disabled={isMarkingPaid === invoice.id!}
                             className="p-2 text-neutral-600 hover:text-green-600 hover:bg-neutral-100 transition-colors disabled:opacity-50"
                             title="Mark as paid"
                           >

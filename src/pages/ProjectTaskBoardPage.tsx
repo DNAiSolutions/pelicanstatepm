@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { projectService } from '../services/projectService';
 import { projectTaskService } from '../services/projectTaskService';
-import { mockUsers, type Project, type WorkOrder } from '../data/pipeline';
+import { mockUsers, type WorkOrder } from '../data/pipeline';
 import { Plus, Users } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -13,7 +13,7 @@ const columnLabels: Record<'todo' | 'inprogress' | 'done', string> = {
 };
 
 export function ProjectTaskBoardPage() {
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [projects, setProjects] = useState<any[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [tasks, setTasks] = useState<WorkOrder[]>([]);
 
@@ -70,7 +70,7 @@ export function ProjectTaskBoardPage() {
               </option>
             ))}
           </select>
-          <button className="px-4 py-2 rounded-full bg-[#143352] text-white text-sm font-semibold">Task Board</button>
+          <button className="px-4 py-2 rounded-full bg-[#0f2749] text-white text-sm font-semibold">Task Board</button>
         </div>
       </div>
 
@@ -84,7 +84,7 @@ export function ProjectTaskBoardPage() {
           <span className="text-sm text-neutral-500">+{Math.max(projects.length - 5, 0)} more collaborators</span>
         </div>
         <div className="flex items-center gap-2">
-          <button className="px-4 py-2 rounded-full bg-[#143352] text-white text-sm font-semibold flex items-center gap-2">
+          <button className="px-4 py-2 rounded-full bg-[#0f2749] text-white text-sm font-semibold flex items-center gap-2">
             <Plus className="w-4 h-4" />
             Add task
           </button>

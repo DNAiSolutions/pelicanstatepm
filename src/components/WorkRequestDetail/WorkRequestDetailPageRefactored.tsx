@@ -118,7 +118,7 @@ export function WorkRequestDetailPageRefactored() {
     return (
       <div className="flex items-center justify-center min-h-screen bg-white">
         <div className="text-center">
-          <div className="w-12 h-12 border-4 border-[#143352]/20 border-t-[#143352] rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-12 h-12 border-4 border-[#0f2749]/20 border-t-[#0f2749] rounded-full animate-spin mx-auto mb-4" />
           <p className="text-neutral-600">Loading work order...</p>
         </div>
       </div>
@@ -188,7 +188,7 @@ export function WorkRequestDetailPageRefactored() {
               }}
               className={`flex items-center gap-2 px-4 py-3 font-medium border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-[#143352] text-[#143352]'
+                  ? 'border-[#0f2749] text-[#0f2749]'
                   : tab.locked
                   ? 'border-transparent text-neutral-400 cursor-not-allowed'
                   : 'border-transparent text-neutral-600 hover:text-neutral-900'
@@ -252,7 +252,7 @@ export function WorkRequestDetailPageRefactored() {
                       <div className="flex items-center gap-2">
                         <div className="flex-1 bg-gray-200 h-2 rounded-full">
                           <div
-                            className="bg-[#143352] h-2 rounded-full"
+                            className="bg-[#0f2749] h-2 rounded-full"
                             style={{ width: `${workOrder.percentComplete}%` }}
                           />
                         </div>
@@ -342,7 +342,7 @@ export function WorkRequestDetailPageRefactored() {
           {activeTab === 'quotes' && (
             <WorkRequestQuotes
               quotes={quotes}
-              onNewQuoteClick={() => navigate(`/estimates/new/${workOrder.id}`)}
+              onNewQuoteClick={() => navigate(`/quotes/new/${workOrder.id}`)}
               onApproveQuote={handleApproveQuote}
               onRequestChanges={handleRequestQuoteChanges}
             />
@@ -352,7 +352,7 @@ export function WorkRequestDetailPageRefactored() {
         {/* Right Sidebar */}
         <WorkRequestSidebar
           workOrder={workOrder}
-          onQuoteCreate={() => navigate(`/estimates/new/${workOrder.id}`)}
+          onQuoteCreate={() => navigate(`/quotes/new/${workOrder.id}`)}
           onScheduleClick={() => setActiveTab('schedule')}
           onCompletionClick={() => setActiveTab('completion')}
           onInvoiceGenerate={() => navigate(`/invoices/new?workOrder=${workOrder.id}`)}

@@ -1,24 +1,44 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Poppins:wght@500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Public+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --brand-primary: #0f2749;
+    --brand-primary-dark: #0a1a31;
+    --brand-secondary: #153459;
+    --brand-accent: #f4b740;
+    --brand-sand: #f5f7fb;
+    --text-body: #0f1f33;
+    --text-muted: #66728a;
+    --border-subtle: #d2d8e5;
+    --card-shadow: 0 18px 45px rgba(8, 21, 43, 0.08);
+    --radius-lg: 22px;
+  }
+
   * {
-    @apply border-neutral-200;
+    border-color: var(--border-subtle);
+  }
+
+  button,
+  [type='button'],
+  [type='submit'],
+  [type='reset'] {
+    border-radius: 9999px;
   }
   
   body {
-    @apply bg-white text-[#1F2933] font-sans antialiased;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    @apply bg-[var(--brand-sand)] text-[var(--text-body)] antialiased;
+    font-family: 'Public Sans', system-ui, -apple-system, sans-serif;
     margin: 0;
     min-height: 100vh;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    @apply font-heading font-semibold text-[#1F2933];
-    font-family: 'Poppins', system-ui, -apple-system, sans-serif;
+    @apply font-heading font-semibold text-[var(--text-body)];
+    font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif;
   }
 
   /* Custom scrollbar */
@@ -42,8 +62,9 @@
 
 @layer components {
   .card {
-    @apply bg-white border border-neutral-200 rounded-none;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    @apply bg-white border border-[var(--border-subtle)];
+    border-radius: var(--radius-lg);
+    box-shadow: var(--card-shadow);
   }
   
   .card-hover {
@@ -51,17 +72,30 @@
   }
   
   .btn-primary {
-    @apply bg-[#143352] hover:bg-[#0F1F2D] text-white font-medium px-4 py-2 transition-colors duration-200;
-    font-family: 'Poppins', system-ui, sans-serif;
+    @apply text-white font-medium px-4 py-2 transition-colors duration-200;
+    background: linear-gradient(135deg, var(--brand-primary), var(--brand-secondary));
+    border-radius: 9999px;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
+    letter-spacing: 0.01em;
   }
-  
+
   .btn-secondary {
-    @apply bg-white hover:bg-neutral-50 text-[#1F2933] font-medium px-4 py-2 border border-neutral-200 transition-colors duration-200;
-    font-family: 'Poppins', system-ui, sans-serif;
+    @apply bg-white hover:bg-neutral-50 text-[var(--text-body)] font-medium px-4 py-2 border transition-colors duration-200;
+    border-color: var(--border-subtle);
+    border-radius: 9999px;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
   }
-  
+
   .input-field {
-    @apply w-full px-4 py-2 border border-neutral-200 bg-white text-[#1F2933] focus:outline-none focus:border-[#143352] transition-colors;
+    @apply w-full px-4 py-2 border bg-white text-[var(--text-body)] focus:outline-none transition-colors;
+    border-color: var(--border-subtle);
+    border-radius: 16px;
+    box-shadow: inset 0 1px 2px rgba(15, 82, 60, 0.05);
+  }
+
+  .input-field:focus {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(15, 109, 55, 0.15);
   }
   
   .input-field::placeholder {
@@ -69,7 +103,7 @@
   }
   
   .status-chip {
-    @apply inline-flex items-center px-3 py-1 text-xs font-medium border;
+    @apply inline-flex items-center px-3 py-1 text-xs font-medium border rounded-full;
   }
   
   .status-badge {
@@ -102,7 +136,9 @@
   
   /* Table styles */
   .table-container {
-    @apply bg-white border border-neutral-200 overflow-hidden;
+    @apply bg-white border overflow-hidden;
+    border-color: var(--border-subtle);
+    border-radius: 20px;
   }
   
   .data-table {
@@ -110,11 +146,13 @@
   }
   
   .data-table th {
-    @apply text-left py-3 px-4 text-sm font-semibold text-neutral-700 bg-neutral-50 border-b border-neutral-200;
+    @apply text-left py-3 px-4 text-sm font-semibold text-neutral-700 bg-[var(--brand-sand)] border-b;
+    border-color: var(--border-subtle);
   }
   
   .data-table td {
-    @apply py-3 px-4 text-sm text-neutral-600 border-b border-neutral-100;
+    @apply py-3 px-4 text-sm text-neutral-600 border-b;
+    border-color: var(--border-subtle);
   }
   
   .data-table tr:hover td {
@@ -127,7 +165,7 @@
   }
   
   .page-title {
-    @apply text-2xl font-heading font-semibold text-[#1F2933];
+    @apply text-2xl font-heading font-semibold text-[var(--text-body)];
   }
   
   .page-subtitle {
@@ -146,22 +184,22 @@
 
 @layer utilities {
   .text-brand {
-    color: #143352;
+    color: var(--brand-primary);
   }
   
   .bg-brand {
-    background-color: #143352;
+    background-color: var(--brand-primary);
   }
   
   .border-brand {
-    border-color: #143352;
+    border-color: var(--brand-primary);
   }
   
   .font-heading {
-    font-family: 'Poppins', system-ui, sans-serif;
+    font-family: 'Space Grotesk', system-ui, sans-serif;
   }
   
   .font-body {
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Public Sans', system-ui, sans-serif;
   }
 }

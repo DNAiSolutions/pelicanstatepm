@@ -19,7 +19,7 @@ Build a **construction/facilities PM platform** for clients managing multiple pr
 {
   "id": "string (UUID)",
   "requestNumber": "string (auto-generated, e.g., WR-2024-001)",
-  "campus": "enum: Campus_A | Campus_B | Campus_C (REQUIRED)",
+  "property": "enum: Property_A | Property_B | Property_C (REQUIRED)",
   "property": "string (building name, REQUIRED)",
   "isHistoric": "boolean (REQUIRED)",
   "category": "enum: SmallTask | EventSupport | ConstructionProject",
@@ -31,7 +31,7 @@ Build a **construction/facilities PM platform** for clients managing multiple pr
   "requestedBy": "User",
   "requestedAt": "datetime",
   "attachments": "File[]",
-  "fundingSource": "string (campus-based default or custom)"
+  "fundingSource": "string (property-based default or custom)"
 }
 ```
 
@@ -107,7 +107,7 @@ Completed → Invoicing → Paid → Closed
   "id": "string",
   "invoiceNumber": "string (auto-generated)",
   "workRequestIds": "string[] (FK)",
-  "campus": "string",
+  "property": "string",
   "fundingSource": "string",
   "lineItems": [
     {
@@ -156,11 +156,11 @@ Completed → Invoicing → Paid → Closed
 
 ### Supporting Entities
 
-#### 8. Campus
+#### 8. Property
 ```json
 {
   "id": "string",
-  "name": "enum: Campus_A | Campus_B | Campus_C",
+  "name": "enum: Property_A | Property_B | Property_C",
   "defaultFundingSource": "string",
   "activePrograms": "boolean"
 }
@@ -180,13 +180,13 @@ Completed → Invoicing → Paid → Closed
 
 ### Client Requirements (from call transcript)
 1. **No surprise work**: Work cannot start without quote → approval → schedule
-2. **Invoices must be detailed**: What work, which location, which campus/funding source
+2. **Invoices must be detailed**: What work, which location, which property/funding source
 3. **One accountable counterparty**: Pelican State invoices client; subs paid internally
 4. **Historic sites = audit-ready documentation**: Materials, methods, photos, change logs
 5. **Visibility into schedule + delays + blockers** (especially for construction projects)
 6. **Communication**: Threaded updates inside work items (not just email)
 7. **Weekly digests**: Auto-summary for stakeholders
-8. **Split invoicing**: Support separate invoices per campus OR one invoice with sections
+8. **Split invoicing**: Support separate invoices per property OR one invoice with sections
 
 ### System Behavior
 1. **Calm + Controlled**: System feels like a "calm operations desk"—quiet confidence

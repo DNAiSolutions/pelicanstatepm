@@ -15,7 +15,7 @@ const VALID_TRANSITIONS: Record<WorkRequestStatus, WorkRequestStatus[]> = {
 
 // Required fields for each status
 const REQUIRED_FIELDS_BY_STATUS: Record<WorkRequestStatus, string[]> = {
-  Intake: ['property', 'category', 'description', 'campus_id'],
+  Intake: ['property', 'category', 'description', 'property_id'],
   Scoping: ['property', 'category', 'description', 'scope_details'],
   Estimate: ['estimated_cost', 'line_items'],
   Approval: ['estimated_cost', 'approved_by', 'approved_at'],

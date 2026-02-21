@@ -1,9 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Share2 } from 'lucide-react';
-import type { Project } from '../../data/pipeline';
-
 export interface ProjectDetailHeaderProps {
-  project: Project;
+  project: any;
   onGoBack?: () => void;
 }
 

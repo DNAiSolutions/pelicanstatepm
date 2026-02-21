@@ -1,25 +1,25 @@
-# Multi-Campus Invoice Splitting - Testing Guide
+# Multi-Property Invoice Splitting - Testing Guide
 
 ## Overview
-The PM Dashboard supports creating invoices that span multiple campuses. When work requests from different campuses are selected, the system automatically splits the invoice by campus and funding source.
+The PM Dashboard supports creating invoices that span multiple properties. When work requests from different properties are selected, the system automatically splits the invoice by property and funding source.
 
 ---
 
 ## Feature Description
 
 ### How It Works
-1. **Select Work Requests** - Choose completed work requests from multiple campuses
+1. **Select Work Requests** - Choose completed work requests from multiple properties
 2. **Add Line Items** - Assign each line item to a specific work request
-3. **Auto-Split** - System groups items by campus
-4. **Create Invoices** - Separate invoice generated for each campus
-5. **Funding Source** - Each campus uses its own funding source automatically
+3. **Auto-Split** - System groups items by property
+4. **Create Invoices** - Separate invoice generated for each property
+5. **Funding Source** - Each property uses its own funding source automatically
 
 ### Example
 ```
 Input:
-- Work Request 1: Wallace Campus (Funding: State Budget A)
-- Work Request 2: Woodland Campus (Funding: State Budget B)
-- Work Request 3: Wallace Campus (Funding: State Budget A)
+- Work Request 1: Wallace Property (Funding: State Budget A)
+- Work Request 2: Woodland Property (Funding: State Budget B)
+- Work Request 3: Wallace Property (Funding: State Budget A)
 
 Output:
 - Invoice 1: Wallace (Items 1 & 3, $4,880, State Budget A)
@@ -31,10 +31,10 @@ Output:
 ## Pre-Test Setup
 
 ### Required Test Data
-1. **3 Work Requests (minimum)** - Different campuses
-   - WR1: Wallace Campus
-   - WR2: Woodland/Laplace Campus
-   - WR3: Paris Campus
+1. **3 Work Requests (minimum)** - Different properties
+   - WR1: Wallace Property
+   - WR2: Woodland/Laplace Property
+   - WR3: Paris Property
 
 2. **3 Estimates** - One for each work request
    - Should have completed estimates ready to invoice
@@ -44,7 +44,7 @@ Output:
 
 ### Setup Steps
 ```
-1. Create 3 work requests (different campuses)
+1. Create 3 work requests (different properties)
 2. For each work request:
    - Create estimate with line items
    - Change status to "Complete"
@@ -55,9 +55,9 @@ Output:
 
 ## Test Scenarios
 
-### Scenario 1: Single Campus Invoice (Baseline)
+### Scenario 1: Single Property Invoice (Baseline)
 
-**Test Objective:** Verify invoice creation works for single campus (baseline test)
+**Test Objective:** Verify invoice creation works for single property (baseline test)
 
 #### Test Steps
 ```
@@ -70,27 +70,27 @@ Output:
    - Location: "Room 101"
    - Amount: $680
 6. Click "Preview PDF"
-   - Verify PDF shows: Campus: Wallace, Funding: State Budget A
+   - Verify PDF shows: Property: Wallace, Funding: State Budget A
 7. Click "Create & Submit Invoice(s)"
 8. Verify:
    - Invoice created successfully (toast message)
    - Invoice number: INV-001 (or similar)
    - Status: Submitted
-   - Campus: Wallace
+   - Property: Wallace
    - Funding Source: State Budget A
 ```
 
 **Expected Result:**
 - ✅ Single invoice created
-- ✅ Campus info correct
+- ✅ Property info correct
 - ✅ Funding source correct
 - ✅ PDF shows correct information
 
 ---
 
-### Scenario 2: Two Campuses Invoice Splitting
+### Scenario 2: Two Properties Invoice Splitting
 
-**Test Objective:** Verify invoices are correctly split across 2 campuses
+**Test Objective:** Verify invoices are correctly split across 2 properties
 
 #### Test Steps
 ```
@@ -112,7 +112,7 @@ Output:
    - Amount: $1,200
 7. Verify Invoice Summary shows:
    ┌─────────────────────────────────┐
-   │ Invoice Summary by Campus       │
+   │ Invoice Summary by Property       │
    ├─────────────────────────────────┤
    │ Wallace       | State Budget A   │
    │ Woodland      | State Budget B   │
@@ -121,7 +121,7 @@ Output:
 ```
 
 **Expected Results:**
-- ✅ 2 invoices created (one per campus)
+- ✅ 2 invoices created (one per property)
 - ✅ Invoice 1: Wallace, $680, State Budget A
 - ✅ Invoice 2: Woodland, $1,200, State Budget B
 - ✅ Both show "Submitted" status
@@ -135,17 +135,17 @@ Output:
    - INV-001: $680, Wallace, Submitted
    - INV-002: $1,200, Woodland, Submitted
 3. Click each to verify details:
-   - Campus correct
+   - Property correct
    - Funding source correct
    - Line items correct
-4. Download PDFs for both and verify they show correct campus info
+4. Download PDFs for both and verify they show correct property info
 ```
 
 ---
 
-### Scenario 3: Three Campuses Invoice Splitting
+### Scenario 3: Three Properties Invoice Splitting
 
-**Test Objective:** Verify splitting works correctly with 3 campuses
+**Test Objective:** Verify splitting works correctly with 3 properties
 
 #### Test Steps
 ```
@@ -174,7 +174,7 @@ Output:
    - Work Request: WR-003
    - Amount: $3,100
 
-4. Verify summary shows all 3 campuses:
+4. Verify summary shows all 3 properties:
    ┌─────────────────────────────────┐
    │ Wallace       | State Budget A   │
    │ Woodland      | State Budget B   │
@@ -196,7 +196,7 @@ Output:
 **Verification:**
 ```
 1. Go to /invoices - verify 3 invoices
-2. Filter by campus (if available):
+2. Filter by property (if available):
    - Wallace: 1 invoice
    - Woodland: 1 invoice
    - Paris: 1 invoice
@@ -206,9 +206,9 @@ Output:
 
 ---
 
-### Scenario 4: Multiple Line Items, Same Campus
+### Scenario 4: Multiple Line Items, Same Property
 
-**Test Objective:** Verify multiple items from same campus are combined in one invoice
+**Test Objective:** Verify multiple items from same property are combined in one invoice
 
 #### Test Steps
 ```
@@ -228,17 +228,17 @@ Output:
 ```
 
 **Expected Results:**
-- ✅ Only 1 invoice created (same campus)
+- ✅ Only 1 invoice created (same property)
 - ✅ All 4 line items appear in invoice
 - ✅ Total: $2,100
-- ✅ Campus: Wallace
+- ✅ Property: Wallace
 - ✅ Funding: State Budget A
 
 ---
 
-### Scenario 5: Multiple Items, Split Across Campuses
+### Scenario 5: Multiple Items, Split Across Properties
 
-**Test Objective:** Verify items from same work request distribute to correct campus
+**Test Objective:** Verify items from same work request distribute to correct property
 
 #### Test Steps
 ```
@@ -290,33 +290,33 @@ Output:
 
 ---
 
-### Scenario 6: PDF Download for Multi-Campus
+### Scenario 6: PDF Download for Multi-Property
 
-**Test Objective:** Verify PDF preview shows correct campus info before creation
+**Test Objective:** Verify PDF preview shows correct property info before creation
 
 #### Test Steps
 ```
 1. Navigate to /invoices/new
-2. Select 2 work requests (different campuses)
-3. Add 2 line items (one per campus)
+2. Select 2 work requests (different properties)
+3. Add 2 line items (one per property)
 4. Click "Preview PDF" button
 5. Verify PDF downloads:
-   - Filename: "Invoice-Preview-[Campus].pdf"
-   - OR shows preview of first campus
+   - Filename: "Invoice-Preview-[Property].pdf"
+   - OR shows preview of first property
 ```
 
 **Expected Results:**
 - ✅ PDF generates successfully
-- ✅ PDF shows correct campus
+- ✅ PDF shows correct property
 - ✅ PDF shows correct funding source
 - ✅ Line items are accurate
 - ✅ Total amount is correct
 
 ---
 
-### Scenario 7: Role-Based Access with Multi-Campus
+### Scenario 7: Role-Based Access with Multi-Property
 
-**Test Objective:** Verify limited users can only see/split their assigned campus
+**Test Objective:** Verify limited users can only see/split their assigned property
 
 #### Test Steps
 ```
@@ -334,20 +334,20 @@ Output:
 ```
 
 **Expected Results:**
-- ✅ Limited user sees only assigned campus work requests
-- ✅ Cannot select other campus work requests
-- ✅ Cannot create multi-campus invoices (RLS enforced)
-- ✅ Invoice only created for assigned campus
+- ✅ Limited user sees only assigned property work requests
+- ✅ Cannot select other property work requests
+- ✅ Cannot create multi-property invoices (RLS enforced)
+- ✅ Invoice only created for assigned property
 
 ---
 
-### Scenario 8: Invoice Payment Tracking (Multi-Campus)
+### Scenario 8: Invoice Payment Tracking (Multi-Property)
 
 **Test Objective:** Verify each split invoice can be marked paid independently
 
 #### Test Steps
 ```
-1. Create multi-campus invoice (2 campuses)
+1. Create multi-property invoice (2 properties)
 2. Go to /invoices
 3. Find Invoice 1 (Wallace, $2,400)
 4. Click on it
@@ -374,7 +374,7 @@ Output:
 ### Test Case 1: No Line Items
 ```
 Steps:
-1. Select 2 work requests (different campuses)
+1. Select 2 work requests (different properties)
 2. Don't add any line items
 3. Try to click "Create & Submit"
 
@@ -382,7 +382,7 @@ Expected: Button disabled or error message shows
 Message: "Add at least one line item"
 ```
 
-### Test Case 2: Empty Campus
+### Test Case 2: Empty Property
 ```
 Steps:
 1. Select work request
@@ -422,10 +422,10 @@ For each split invoice, verify PDF contains:
 
 ```
 ☐ Correct invoice number (INV-001, INV-002, etc.)
-☐ Correct campus name
-☐ Correct funding source for campus
-☐ All line items for that campus
-☐ Correct total for that campus
+☐ Correct property name
+☐ Correct funding source for property
+☐ All line items for that property
+☐ Correct total for that property
 ☐ Invoice date
 ☐ Professional formatting
 ☐ Readable text
@@ -433,7 +433,7 @@ For each split invoice, verify PDF contains:
 ☐ Company branding (if configured)
 ```
 
-### Example: 2-Campus Invoice PDFs
+### Example: 2-Property Invoice PDFs
 
 **Invoice 1 (PDF for Wallace):**
 ```
@@ -442,7 +442,7 @@ For each split invoice, verify PDF contains:
 │                             │
 │ Invoice Number: INV-001     │
 │ Date: February 8, 2024      │
-│ Campus: Wallace             │
+│ Property: Wallace             │
 │ Funding Source: Budget A    │
 ├─────────────────────────────┤
 │ Description    | Amount     │
@@ -461,7 +461,7 @@ For each split invoice, verify PDF contains:
 │                             │
 │ Invoice Number: INV-002     │
 │ Date: February 8, 2024      │
-│ Campus: Woodland (Laplace)  │
+│ Property: Woodland (Laplace)  │
 │ Funding Source: Budget B    │
 ├─────────────────────────────┤
 │ Description    | Amount     │
@@ -479,10 +479,10 @@ For each split invoice, verify PDF contains:
 
 | Scenario | Test | Status | Notes |
 |----------|------|--------|-------|
-| 1 | Single Campus | ⬜ | |
-| 2 | Two Campuses | ⬜ | |
-| 3 | Three Campuses | ⬜ | |
-| 4 | Same Campus Multiple | ⬜ | |
+| 1 | Single Property | ⬜ | |
+| 2 | Two Properties | ⬜ | |
+| 3 | Three Properties | ⬜ | |
+| 4 | Same Property Multiple | ⬜ | |
 | 5 | Split Distribution | ⬜ | |
 | 6 | PDF Download | ⬜ | |
 | 7 | RBAC Limited User | ⬜ | |
@@ -496,14 +496,14 @@ For each split invoice, verify PDF contains:
 
 ## Database Verification
 
-After creating multi-campus invoices, verify in Supabase:
+After creating multi-property invoices, verify in Supabase:
 
 ### Check Invoices Table
 ```sql
 SELECT 
   id,
   invoice_number,
-  campus_id,
+  property_id,
   funding_source,
   total_amount,
   status
@@ -512,7 +512,7 @@ WHERE created_at > NOW() - INTERVAL '1 hour'
 ORDER BY created_at DESC;
 ```
 
-Expected: Multiple invoices with different campus_id values
+Expected: Multiple invoices with different property_id values
 
 ### Check Line Items per Invoice
 ```sql
@@ -525,15 +525,15 @@ FROM invoices
 WHERE created_at > NOW() - INTERVAL '1 hour';
 ```
 
-Expected: Line items distributed by campus
+Expected: Line items distributed by property
 
 ---
 
 ## Performance Considerations
 
-### Large Multi-Campus Invoices
+### Large Multi-Property Invoices
 ```
-Test: Create invoice with 50+ line items across 3 campuses
+Test: Create invoice with 50+ line items across 3 properties
 
 Performance Checklist:
 [ ] Form loads in <2 seconds

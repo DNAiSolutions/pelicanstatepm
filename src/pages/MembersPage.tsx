@@ -45,7 +45,7 @@ export function MembersPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center gap-3">
-        <div className="p-3 bg-[#143352]/10 text-[#143352]">
+        <div className="p-3 bg-[#0f2749]/10 text-[#0f2749]">
           <ShieldAlert className="w-6 h-6" />
         </div>
         <div>
@@ -108,7 +108,7 @@ export function MembersPage() {
                 ) : (
                   <button
                     onClick={() => handleApprove(profile)}
-                    className="px-3 py-1 text-xs font-semibold border border-[#143352] text-[#143352] hover:bg-[#143352] hover:text-white transition-colors"
+                    className="px-3 py-1 text-xs font-semibold border border-[#0f2749] text-[#0f2749] hover:bg-[#0f2749] hover:text-white transition-colors"
                     disabled={updatingId === profile.user_id}
                   >
                     {updatingId === profile.user_id ? 'Updating…' : 'Approve'}

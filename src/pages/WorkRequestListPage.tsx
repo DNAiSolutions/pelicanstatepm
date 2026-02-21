@@ -1,61 +1,46 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Eye, Edit2, Search, Building, AlertTriangle } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { LeadIntakeModal } from '../components/leads/LeadIntakeModal';
 import { useProfileData } from '../hooks/useProfileData';
+import { useAuth } from '../context/AuthContext';
+import { workRequestService } from '../services/workRequestService';
+import { propertyService } from '../services/propertyService';
+import type { WorkRequest as SupabaseWorkRequest, Property as SupabaseProperty, WorkRequestStatus } from '../types';
 
 // Import pipeline data helpers
 import {
   getSiteById,
-  getCampusById,
+  getPropertyById,
   getApprovedQuote,
   type WorkOrderStatus,
 } from '../data/pipeline';
 
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(value);
+
 export function WorkRequestListPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { workOrders: mockWorkOrders, campuses: mockCampuses } = useProfileData();
+  const { workOrders: mockWorkOrders, properties: mockProperties } = useProfileData();
 
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedStatus, setSelectedStatus] = useState<string>(searchParams.get('status') || '');
-  const [selectedCampus, setSelectedCampus] = useState<string>(searchParams.get('campus') || '');
+  const [selectedProperty, setSelectedProperty] = useState<string>(searchParams.get('property') || '');
   const [selectedPriority, setSelectedPriority] = useState<string>('');
   const [showLeadIntake, setShowLeadIntake] = useState(false);
+  const { user } = useAuth();
+  const isDemoProfile = (user?.email ?? '').toLowerCase() === 'demo@pelicanstate.com';
+  const [remoteRequests, setRemoteRequests] = useState<SupabaseWorkRequest[]>([]);
+  const [remoteProperties, setRemoteProperties] = useState<SupabaseProperty[]>([]);
+  const [loadingRemote, setLoadingRemote] = useState(false);
 
-  // Filter work orders
-  const filteredWorkOrders = useMemo(() => {
-    return mockWorkOrders.filter((wo) => {
-      const site = getSiteById(wo.siteId);
-
-      const matchesSearch =
-        wo.requestNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        wo.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        site?.name.toLowerCase().includes(searchTerm.toLowerCase());
-
-      const matchesStatus = !selectedStatus || wo.status === selectedStatus;
-      const matchesCampus = !selectedCampus || site?.campusId === selectedCampus;
-      const matchesPriority = !selectedPriority || wo.priority === selectedPriority;
-
-      return matchesSearch && matchesStatus && matchesCampus && matchesPriority;
-    });
-  }, [searchTerm, selectedStatus, selectedCampus, selectedPriority]);
-
-  // Calculate summary stats
-  const stats = useMemo(() => {
-    const total = filteredWorkOrders.length;
-    const inProgress = filteredWorkOrders.filter((wo) =>
-      ['InProgress', 'Scheduled', 'AwaitingApproval'].includes(wo.status)
-    ).length;
-    const completed = filteredWorkOrders.filter((wo) =>
-      ['Completed', 'Invoiced', 'Paid'].includes(wo.status)
-    ).length;
-    const totalValue = filteredWorkOrders.reduce((sum, wo) => sum + (wo.estimatedCost || 0), 0);
-    return { total, inProgress, completed, totalValue };
-  }, [filteredWorkOrders]);
-
-  const getStatusColor = (status: WorkOrderStatus) => {
+  const getStatusColor = (status: string) => {
     const colors: Record<string, string> = {
       Requested: 'bg-gray-100 text-gray-800',
       Scoped: 'bg-blue-100 text-blue-800',
@@ -68,6 +53,14 @@ export function WorkRequestListPage() {
       Invoiced: 'bg-purple-100 text-purple-800',
       Paid: 'bg-emerald-100 text-emerald-800',
       Closed: 'bg-gray-100 text-gray-700',
+      Intake: 'bg-gray-100 text-gray-800',
+      Scoping: 'bg-blue-100 text-blue-800',
+      Estimate: 'bg-sky-100 text-sky-800',
+      Approval: 'bg-amber-100 text-amber-800',
+      Schedule: 'bg-cyan-100 text-cyan-800',
+      Progress: 'bg-blue-100 text-blue-800',
+      Complete: 'bg-green-100 text-green-800',
+      Invoice: 'bg-purple-100 text-purple-800',
     };
     return colors[status] || 'bg-gray-100 text-gray-800';
   };
@@ -85,7 +78,7 @@ export function WorkRequestListPage() {
     }
   };
 
-  const statuses: WorkOrderStatus[] = [
+  const demoStatuses: WorkOrderStatus[] = [
     'Requested',
     'Scoped',
     'AwaitingApproval',
@@ -98,249 +91,391 @@ export function WorkRequestListPage() {
     'Paid',
   ];
 
-  return (
-    <div className="p-8 max-w-7xl mx-auto">
-      {/* Header */}
-      <div className="mb-8 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-heading font-bold text-neutral-900 mb-2">
-            Work Orders
-          </h1>
-          <p className="text-neutral-600">
-            Manage all work orders across campuses
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowLeadIntake(true)}
-            className="border border-neutral-300 text-neutral-700 inline-flex items-center gap-2 py-3 px-6 font-medium transition-colors"
-          >
-            <Plus className="w-5 h-5" /> New Intake
-          </button>
-          <button
-            onClick={() => navigate('/work-requests/new')}
-            className="bg-[#143352] hover:bg-[#143352]/90 text-white inline-flex items-center gap-2 py-3 px-6 font-medium transition-colors"
-          >
-            <Plus className="w-5 h-5" />
-            New Work Order
-          </button>
-        </div>
-      </div>
+  const portalStatuses: WorkRequestStatus[] = [
+    'Intake',
+    'Scoping',
+    'Estimate',
+    'Approval',
+    'Schedule',
+    'Progress',
+    'Complete',
+    'Invoice',
+    'Paid',
+  ];
 
-      {/* Filters */}
-      <div className="bg-white border border-neutral-200 p-6 mb-6">
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Search */}
-          <div className="relative">
-            <Search className="absolute left-3 top-3 w-4 h-4 text-neutral-400" />
+  useEffect(() => {
+    if (isDemoProfile) return;
+    let isMounted = true;
+    async function loadRemoteData() {
+      try {
+        setLoadingRemote(true);
+        const [requests, properties] = await Promise.all([
+          workRequestService.getWorkRequests(),
+          propertyService.getProperties(),
+        ]);
+        if (!isMounted) return;
+        setRemoteRequests(requests as SupabaseWorkRequest[]);
+        setRemoteProperties(properties as SupabaseProperty[]);
+      } catch (error) {
+        console.error('Failed to load work requests', error);
+        toast.error('Unable to load work requests');
+      } finally {
+        if (isMounted) {
+          setLoadingRemote(false);
+        }
+      }
+    }
+    loadRemoteData();
+    return () => {
+      isMounted = false;
+    };
+  }, [isDemoProfile]);
+
+  type RequestRow = {
+    id: string;
+    requestNumber: string;
+    title?: string;
+    propertyName?: string;
+    siteName?: string;
+    priority?: string;
+    status: string;
+    percentComplete?: number;
+    estimatedCost?: number;
+    propertyId?: string;
+    isHistoric?: boolean;
+  };
+
+  const requestRows = useMemo<RequestRow[]>(() => {
+    if (isDemoProfile) {
+      return mockWorkOrders.map((wo: any) => {
+        const site = getSiteById(wo.siteId);
+        const property = site ? getPropertyById(site.propertyId) : null;
+        const approvedQuote = getApprovedQuote(wo.id);
+        return {
+          id: wo.id,
+          requestNumber: wo.requestNumber,
+          title: wo.title,
+          propertyName: property?.name,
+          siteName: site?.name,
+          priority: wo.priority,
+          status: wo.status,
+          percentComplete: wo.percentComplete,
+          estimatedCost: wo.estimatedCost ?? approvedQuote?.totalEstimate,
+          propertyId: property?.id,
+          isHistoric: site?.isHistoric,
+        };
+      });
+    }
+    return remoteRequests.map((request) => {
+      const intakePayload = (request.intake_payload ?? {}) as Record<string, any>;
+      const progressValue = typeof intakePayload.progress === 'number' ? intakePayload.progress : 0;
+      return {
+        id: request.id,
+        requestNumber: request.request_number,
+        title: request.title || request.description || 'Untitled request',
+        propertyName: request.property,
+        siteName: request.property,
+        priority: request.priority || 'Medium',
+        status: request.status,
+        percentComplete: progressValue,
+        estimatedCost: request.estimated_cost ? Number(request.estimated_cost) : undefined,
+        propertyId: request.property_id,
+      };
+    });
+  }, [isDemoProfile, mockWorkOrders, remoteRequests]);
+
+  const filteredRequests = useMemo(() => {
+    return requestRows.filter((row) => {
+      const term = searchTerm.toLowerCase();
+      const matchesSearch =
+        row.requestNumber.toLowerCase().includes(term) ||
+        (row.title ?? '').toLowerCase().includes(term) ||
+        (row.propertyName?.toLowerCase().includes(term) ?? false) ||
+        (row.siteName?.toLowerCase().includes(term) ?? false);
+      const matchesStatus = !selectedStatus || row.status === selectedStatus;
+      const matchesProperty = !selectedProperty || row.propertyId === selectedProperty;
+      const matchesPriority =
+        !selectedPriority || (row.priority ?? '').toLowerCase() === selectedPriority.toLowerCase();
+      return matchesSearch && matchesStatus && matchesProperty && matchesPriority;
+    });
+  }, [requestRows, searchTerm, selectedStatus, selectedProperty, selectedPriority]);
+
+  const propertyOptions = isDemoProfile ? mockProperties : remoteProperties;
+  const statusOptions = isDemoProfile ? demoStatuses : portalStatuses;
+  const statusFilters = ['All', ...statusOptions];
+
+  const stats = useMemo(() => {
+    const activeStatuses = isDemoProfile
+      ? ['InProgress', 'Scheduled', 'AwaitingApproval']
+      : ['Scoping', 'Estimate', 'Approval', 'Schedule', 'Progress'];
+    const completedStatuses = isDemoProfile
+      ? ['Completed', 'Invoiced', 'Paid']
+      : ['Complete', 'Invoice', 'Paid'];
+
+    const total = filteredRequests.length;
+    const inProgress = filteredRequests.filter((row) => activeStatuses.includes(row.status)).length;
+    const completed = filteredRequests.filter((row) => completedStatuses.includes(row.status)).length;
+    const totalValue = filteredRequests.reduce((sum, row) => sum + (row.estimatedCost || 0), 0);
+    return { total, inProgress, completed, totalValue };
+  }, [filteredRequests, isDemoProfile]);
+
+  const blockedCount = useMemo(
+    () => filteredRequests.filter((row) => row.status === 'Blocked').length,
+    [filteredRequests]
+  );
+
+  return (
+    <div className="space-y-8">
+      <header className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Operations</p>
+          <h1 className="text-3xl font-heading font-semibold text-[var(--text-body)]">Requests</h1>
+          <p className="text-sm text-[var(--text-muted)]">Live intake + dispatch board</p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={() => setShowLeadIntake(true)}
+            className="btn-secondary inline-flex items-center gap-2 text-sm"
+          >
+            <Plus className="w-4 h-4" /> Capture lead
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/work-requests/new')}
+            className="btn-primary inline-flex items-center gap-2 text-sm"
+          >
+            <Plus className="w-4 h-4" /> New request
+          </button>
+        </div>
+      </header>
+
+      <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
+        {[{
+          label: 'Requests in queue',
+          value: stats.total,
+          tone: 'border-slate-200 bg-slate-50 text-slate-800',
+          helper: 'Across Pelican State'
+        },
+        {
+          label: 'Active + scheduled',
+          value: stats.inProgress,
+          tone: 'border-sky-200 bg-sky-50 text-sky-800',
+          helper: 'Moving through teams'
+        },
+        {
+          label: 'Completed this month',
+          value: stats.completed,
+          tone: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+          helper: 'Ready for invoicing'
+        },
+        {
+          label: 'Blocked items',
+          value: blockedCount,
+          tone: 'border-rose-200 bg-rose-50 text-rose-800',
+          helper: 'Need intervention'
+        }].map((card) => (
+          <div key={card.label} className={`card p-5 rounded-3xl ${card.tone}`}>
+            <p className="text-[11px] uppercase tracking-[0.25em] text-[var(--text-muted)]">{card.label}</p>
+            <p className="text-3xl font-heading mt-2">{card.value}</p>
+            <p className="text-xs text-[var(--text-muted)]">{card.helper}</p>
+          </div>
+        ))}
+      </section>
+
+      <section className="card p-6 space-y-6">
+        <div className="flex flex-wrap gap-3">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search className="absolute left-3 top-3 w-4 h-4 text-[var(--text-muted)]" />
             <input
               type="text"
-              placeholder="Search work orders..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#143352]"
+              placeholder="Search request number, scope, or site"
+              className="pl-10 pr-4 py-2 w-full border rounded-full text-sm"
             />
           </div>
-
-          {/* Status Filter */}
           <select
-            value={selectedStatus}
-            onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-4 py-2 border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#143352]"
+            value={selectedProperty}
+            onChange={(e) => setSelectedProperty(e.target.value)}
+            className="px-4 py-2 border rounded-full text-sm text-[var(--text-body)]"
           >
-            <option value="">All Statuses</option>
-            {statuses.map((status) => (
-              <option key={status} value={status}>
-                {status.replace(/([A-Z])/g, ' $1').trim()}
+            <option value="">All properties</option>
+            {propertyOptions.map((property) => (
+              <option key={property.id} value={property.id}>
+                {property.name}
               </option>
             ))}
           </select>
-
-          {/* Campus Filter */}
-          <select
-            value={selectedCampus}
-            onChange={(e) => setSelectedCampus(e.target.value)}
-            className="px-4 py-2 border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#143352]"
-          >
-            <option value="">All Campuses</option>
-            {mockCampuses.map((campus) => (
-              <option key={campus.id} value={campus.id}>
-                {campus.name}
-              </option>
-            ))}
-          </select>
-
-          {/* Priority Filter */}
           <select
             value={selectedPriority}
             onChange={(e) => setSelectedPriority(e.target.value)}
-            className="px-4 py-2 border border-neutral-300 bg-white text-neutral-900 focus:outline-none focus:ring-2 focus:ring-[#143352]"
+            className="px-4 py-2 border rounded-full text-sm text-[var(--text-body)]"
           >
-            <option value="">All Priorities</option>
+            <option value="">All priorities</option>
             <option value="Critical">Critical</option>
             <option value="High">High</option>
             <option value="Medium">Medium</option>
             <option value="Low">Low</option>
           </select>
         </div>
-      </div>
+          <div className="flex flex-wrap gap-2">
+            {statusFilters.map((status) => {
+              const isActive = (status === 'All' && !selectedStatus) || selectedStatus === status;
+              return (
+                <button
+                  key={status}
+                  type="button"
+                onClick={() => setSelectedStatus(status === 'All' ? '' : status)}
+                className={`px-4 py-1.5 text-xs font-medium rounded-full border transition-colors ${
+                  isActive
+                    ? 'bg-[var(--brand-primary)] text-white border-[var(--brand-primary)]'
+                    : 'text-[var(--text-muted)] hover:border-[var(--brand-primary)]'
+                }`}
+              >
+                {status === 'All' ? 'All statuses' : status.replace(/([A-Z])/g, ' $1').trim()}
+              </button>
+            );
+          })}
+        </div>
+      </section>
 
-      {/* List */}
-      <div className="bg-white border border-neutral-200 overflow-hidden">
-        {filteredWorkOrders.length === 0 ? (
-          <div className="p-8 text-center text-neutral-500">
-            <p>No work orders found</p>
+      <section className="card overflow-hidden">
+        <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-[var(--text-muted)]">Requests</p>
+            <h2 className="text-xl font-heading font-semibold">Live intake tracker</h2>
+          </div>
+          <p className="text-sm text-[var(--text-muted)]">{filteredRequests.length} showing</p>
+        </div>
+        {!isDemoProfile && loadingRemote ? (
+          <div className="px-6 py-12 text-center text-[var(--text-muted)]">Loading requests…</div>
+        ) : filteredRequests.length === 0 ? (
+          <div className="px-6 py-12 text-center text-[var(--text-muted)]">
+            <p>No requests match the filters.</p>
             <button
               onClick={() => navigate('/work-requests/new')}
-              className="text-[#143352] font-medium hover:underline mt-2"
+              className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-[var(--brand-primary)]"
             >
-              Create your first work order
+              <Plus className="w-4 h-4" /> Create the first request
             </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-neutral-50 border-b border-neutral-200">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead className="text-xs uppercase text-[var(--text-muted)]">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Work Order
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Location
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Priority
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Progress
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Est. Cost
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-semibold text-neutral-600 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th className="text-left px-6 py-3">Request</th>
+                  <th className="text-left px-6 py-3">Location</th>
+                  <th className="text-left px-6 py-3">Priority</th>
+                  <th className="text-left px-6 py-3">Status</th>
+                  <th className="text-left px-6 py-3">Progress</th>
+                  <th className="text-right px-6 py-3">Est. Value</th>
+                  <th className="text-right px-6 py-3">Actions</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-neutral-100">
-                {filteredWorkOrders.map((wo) => {
-                  const site = getSiteById(wo.siteId);
-                  const campus = site ? getCampusById(site.campusId) : null;
-                  const approvedQuote = getApprovedQuote(wo.id);
-
-                  return (
-                    <tr
-                      key={wo.id}
-                      className="hover:bg-neutral-50 transition-colors cursor-pointer"
-                      onClick={() => navigate(`/work-requests/${wo.id}`)}
-                    >
-                      <td className="px-6 py-4">
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium text-neutral-900">{wo.requestNumber}</p>
-                            {site?.isHistoric && (
-                              <span className="text-xs bg-amber-100 text-amber-700 px-1.5 py-0.5">
-                                Historic
-                              </span>
-                            )}
-                          </div>
-                          <p className="text-sm text-neutral-500 truncate max-w-xs">{wo.title}</p>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
+              <tbody>
+                {filteredRequests.map((row) => (
+                  <tr
+                    key={row.id}
+                    className="border-t border-[var(--border-subtle)] hover:bg-[var(--brand-sand)] cursor-pointer transition-colors"
+                    onClick={() => navigate(`/work-requests/${row.id}`)}
+                  >
+                    <td className="px-6 py-4">
+                      <div>
                         <div className="flex items-center gap-2">
-                          <Building className="w-4 h-4 text-neutral-400" />
-                          <div>
-                            <p className="text-sm text-neutral-900">{site?.name}</p>
-                            <p className="text-xs text-neutral-500">{campus?.name}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <span className={`text-xs px-2 py-1 font-medium ${getPriorityColor(wo.priority)}`}>
-                          {wo.priority}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          {wo.status === 'Blocked' && (
-                            <AlertTriangle className="w-4 h-4 text-red-500" />
+                          <p className="font-medium text-[var(--text-body)]">{row.requestNumber}</p>
+                          {row.isHistoric && (
+                            <span className="text-[10px] uppercase tracking-[0.2em] bg-amber-50 text-amber-700 border border-amber-200 px-2 py-0.5">
+                              Historic
+                            </span>
                           )}
-                          <span className={`text-xs px-2 py-1 font-medium ${getStatusColor(wo.status)}`}>
-                            {wo.status.replace(/([A-Z])/g, ' $1').trim()}
-                          </span>
                         </div>
-                      </td>
-                      <td className="px-6 py-4">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-gray-200 h-1.5 w-20 rounded-full">
-                            <div
-                              className="bg-[#143352] h-1.5 rounded-full"
-                              style={{ width: `${wo.percentComplete}%` }}
-                            />
-                          </div>
-                          <span className="text-xs text-neutral-600">{wo.percentComplete}%</span>
+                        <p className="text-xs text-[var(--text-muted)] truncate max-w-xs">{row.title}</p>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2 text-[var(--text-muted)]">
+                        <Building className="w-4 h-4" />
+                        <div>
+                          <p className="text-sm text-[var(--text-body)]">{row.siteName || row.propertyName || '—'}</p>
+                          <p className="text-xs">{row.propertyName || 'Property TBD'}</p>
                         </div>
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <p className="text-sm font-medium text-neutral-900">
-                          {wo.estimatedCost ? `$${wo.estimatedCost.toLocaleString()}` : 'TBD'}
-                        </p>
-                        {approvedQuote && (
-                          <p className="text-xs text-neutral-500">
-                            Quote: ${approvedQuote.totalEstimate.toLocaleString()}
-                          </p>
-                        )}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={() => navigate(`/work-requests/${wo.id}`)}
-                            className="p-2 text-neutral-600 hover:text-[#143352] hover:bg-neutral-100 transition-colors"
-                            title="View details"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-                          <button
-                            onClick={() => navigate(`/work-requests/${wo.id}/edit`)}
-                            className="p-2 text-neutral-600 hover:text-blue-600 hover:bg-neutral-100 transition-colors"
-                            title="Edit"
-                          >
-                            <Edit2 className="w-4 h-4" />
-                          </button>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <span className={`text-xs px-2 py-0.5 rounded-full border ${getPriorityColor(row.priority || 'Medium')}`}>
+                        {row.priority || 'Medium'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {row.status === 'Blocked' && <AlertTriangle className="w-4 h-4 text-rose-500" />}
+                        <span className={`text-xs px-2 py-0.5 rounded-full ${getStatusColor(row.status)}`}>
+                          {row.status.replace(/([A-Z])/g, ' $1').trim()}
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 bg-neutral-200 h-1.5 w-24 rounded-full">
+                          <div
+                            className="bg-[var(--brand-primary)] h-1.5 rounded-full"
+                            style={{ width: `${Math.min(100, Math.max(0, row.percentComplete ?? 0))}%` }}
+                          />
                         </div>
-                      </td>
-                    </tr>
-                  );
-                })}
+                        <span className="text-xs text-[var(--text-muted)]">{row.percentComplete ?? 0}%</span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <p className="text-sm font-semibold text-[var(--text-body)]">
+                        {row.estimatedCost ? formatCurrency(row.estimatedCost) : 'TBD'}
+                      </p>
+                    </td>
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex items-center justify-end gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          onClick={() => navigate(`/work-requests/${row.id}`)}
+                          className="p-2 text-[var(--text-muted)] hover:text-[var(--brand-primary)] hover:bg-[var(--brand-sand)]"
+                          title="View details"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => navigate(`/work-requests/${row.id}/edit`)}
+                          className="p-2 text-[var(--text-muted)] hover:text-sky-600 hover:bg-[var(--brand-sand)]"
+                          title="Edit request"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
         )}
-      </div>
+      </section>
 
-      {/* Summary */}
-      <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white border border-neutral-200 p-4">
-          <p className="text-sm text-neutral-600">Total Work Orders</p>
-          <p className="text-2xl font-bold text-neutral-900">{stats.total}</p>
+      <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="card p-4">
+          <p className="text-sm text-[var(--text-muted)]">Total requests</p>
+          <p className="text-2xl font-heading">{stats.total}</p>
         </div>
-        <div className="bg-white border border-neutral-200 p-4">
-          <p className="text-sm text-neutral-600">In Progress</p>
-          <p className="text-2xl font-bold text-blue-600">{stats.inProgress}</p>
+        <div className="card p-4">
+          <p className="text-sm text-[var(--text-muted)]">Active pipeline value</p>
+          <p className="text-2xl font-heading">{formatCurrency(stats.totalValue)}</p>
         </div>
-        <div className="bg-white border border-neutral-200 p-4">
-          <p className="text-sm text-neutral-600">Completed</p>
-          <p className="text-2xl font-bold text-green-600">{stats.completed}</p>
+        <div className="card p-4">
+          <p className="text-sm text-[var(--text-muted)]">In progress</p>
+          <p className="text-2xl font-heading text-sky-700">{stats.inProgress}</p>
         </div>
-        <div className="bg-white border border-neutral-200 p-4">
-          <p className="text-sm text-neutral-600">Total Est. Value</p>
-          <p className="text-2xl font-bold text-neutral-900">${stats.totalValue.toLocaleString()}</p>
+        <div className="card p-4">
+          <p className="text-sm text-[var(--text-muted)]">Completed / invoiced</p>
+          <p className="text-2xl font-heading text-emerald-600">{stats.completed}</p>
         </div>
-      </div>
+      </section>
 
       {showLeadIntake && (
         <LeadIntakeModal

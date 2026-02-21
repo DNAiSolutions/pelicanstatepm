@@ -8,7 +8,7 @@ import type {
   TaskTemplate,
 } from '../../data/pipeline';
 import type { ProjectPlan, TemplateTask } from '../../services/projectTaskService';
-import { mockCampuses, mockLeads, mockContacts } from '../../data/pipeline';
+import { mockProperties, mockLeads, mockContacts } from '../../data/pipeline';
 import { JobConversation } from '../intake/JobConversation';
 import { ScopeAnalysisPanel } from '../intake/ScopeAnalysisPanel';
 import { ConsultationChecklist } from '../intake/ConsultationChecklist';
@@ -16,7 +16,7 @@ import { ResearchSnippets } from '../intake/ResearchSnippets';
 
 type ProjectFormType = {
   name: string;
-  campusId: string;
+  propertyId: string;
   locationNotes: string;
   clientName: string;
   clientEmail: string;
@@ -28,10 +28,10 @@ type ProjectFormType = {
   contactId: string;
   clientMode: 'existing' | 'new';
   existingClient: string;
-  campusMode: 'existing' | 'new';
-  newCampusName: string;
-  newCampusFunding: string;
-  newCampusPriority: Priority;
+  propertyMode: 'existing' | 'new';
+  newPropertyName: string;
+  newPropertyFunding: string;
+  newPropertyPriority: Priority;
   scopeNotes: string;
   templateType: TaskTemplate;
 };
@@ -178,60 +178,60 @@ export function ProjectNewModal({
             className="border border-neutral-300 px-3 py-2"
           />
 
-          {/* Campus Mode Selection */}
+          {/* Property Mode Selection */}
           <div className="md:col-span-2 flex items-center gap-4 text-sm text-neutral-600">
             <label className="flex items-center gap-2">
               <input
                 type="radio"
-                name="campusMode"
+                name="propertyMode"
                 value="existing"
-                checked={form.campusMode === 'existing'}
-                onChange={(e) => onFormChange({ campusMode: e.target.value as 'existing' | 'new' })}
+                checked={form.propertyMode === 'existing'}
+                onChange={(e) => onFormChange({ propertyMode: e.target.value as 'existing' | 'new' })}
               />
-              Existing Campus
+              Existing Property
             </label>
             <label className="flex items-center gap-2">
               <input
                 type="radio"
-                name="campusMode"
+                name="propertyMode"
                 value="new"
-                checked={form.campusMode === 'new'}
-                onChange={(e) => onFormChange({ campusMode: e.target.value as 'existing' | 'new' })}
+                checked={form.propertyMode === 'new'}
+                onChange={(e) => onFormChange({ propertyMode: e.target.value as 'existing' | 'new' })}
               />
-              Add New Campus
+              Add New Property
             </label>
           </div>
 
-          {/* Campus Selection */}
-          {form.campusMode === 'existing' ? (
+          {/* Property Selection */}
+          {form.propertyMode === 'existing' ? (
             <select
-              value={form.campusId}
-              onChange={(e) => onFormChange({ campusId: e.target.value })}
+              value={form.propertyId}
+              onChange={(e) => onFormChange({ propertyId: e.target.value })}
               className="border border-neutral-300 px-3 py-2"
             >
-              {mockCampuses.map((campus) => (
-                <option key={campus.id} value={campus.id}>
-                  {campus.name}
+              {mockProperties.map((property) => (
+                <option key={property.id} value={property.id}>
+                  {property.name}
                 </option>
               ))}
             </select>
           ) : (
             <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-3">
               <input
-                value={form.newCampusName}
-                onChange={(e) => onFormChange({ newCampusName: e.target.value })}
-                placeholder="Campus Name"
+                value={form.newPropertyName}
+                onChange={(e) => onFormChange({ newPropertyName: e.target.value })}
+                placeholder="Property Name"
                 className="border border-neutral-300 px-3 py-2"
               />
               <input
-                value={form.newCampusFunding}
-                onChange={(e) => onFormChange({ newCampusFunding: e.target.value })}
+                value={form.newPropertyFunding}
+                onChange={(e) => onFormChange({ newPropertyFunding: e.target.value })}
                 placeholder="Funding Source"
                 className="border border-neutral-300 px-3 py-2"
               />
               <select
-                value={form.newCampusPriority}
-                onChange={(e) => onFormChange({ newCampusPriority: e.target.value as Priority })}
+                value={form.newPropertyPriority}
+                onChange={(e) => onFormChange({ newPropertyPriority: e.target.value as Priority })}
                 className="border border-neutral-300 px-3 py-2"
               >
                 {(['Critical', 'High', 'Medium', 'Low'] as Priority[]).map((priority) => (
@@ -308,7 +308,7 @@ export function ProjectNewModal({
             <div className="md:col-span-2 bg-neutral-50 border border-dashed border-neutral-200 p-3 text-xs text-neutral-600 space-y-1">
               <p className="text-sm font-semibold text-neutral-900 flex items-center gap-2">
                 {selectedTemplateMeta.name}
-                <span className="text-[10px] uppercase tracking-[0.3em] text-[#143352] bg-white border border-[#143352]/20 px-2 py-0.5">
+                <span className="text-[10px] uppercase tracking-[0.3em] text-[#0f2749] bg-white border border-[#0f2749]/20 px-2 py-0.5">
                   {selectedTemplateMeta.category}
                 </span>
               </p>
@@ -333,7 +333,7 @@ export function ProjectNewModal({
                 <button
                   type="button"
                   onClick={onRegeneratePlan}
-                  className="inline-flex items-center gap-2 text-xs text-[#143352] border border-[#143352] px-3 py-1 uppercase tracking-wide"
+                  className="inline-flex items-center gap-2 text-xs text-[#0f2749] border border-[#0f2749] px-3 py-1 uppercase tracking-wide"
                 >
                   <RefreshCcw className="w-3.5 h-3.5" /> Regenerate Plan
                 </button>
@@ -470,7 +470,7 @@ export function ProjectNewModal({
             >
               Cancel
             </button>
-            <button type="submit" className="px-4 py-2 bg-[#143352] text-white">
+            <button type="submit" className="px-4 py-2 bg-[#0f2749] text-white">
               Create Project
             </button>
           </div>

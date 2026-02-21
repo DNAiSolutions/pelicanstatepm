@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { workRequestService } from '../services/workRequestService';
 import { historicDocumentationService } from '../services/historicDocumentationService';
 import type { HistoricDocumentation, WorkRequest } from '../types';
-import { campusService, type Campus } from '../services/campusService';
+import { propertyService, type Property } from '../services/propertyService';
 import {
   Feather,
   PenSquare,
@@ -16,7 +16,7 @@ import toast from 'react-hot-toast';
 
 export function HistoricDocumentationPage() {
   const [workRequests, setWorkRequests] = useState<WorkRequest[]>([]);
-  const [campuses, setCampuses] = useState<Campus[]>([]);
+  const [properties, setProperties] = useState<Property[]>([]);
   const [docs, setDocs] = useState<HistoricDocumentation[]>([]);
   const [selectedId, setSelectedId] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -59,14 +59,14 @@ export function HistoricDocumentationPage() {
   const loadData = async () => {
     try {
       setIsLoading(true);
-      const [wrData, docData, campusData] = await Promise.all([
+      const [wrData, docData, propertyData] = await Promise.all([
         workRequestService.getWorkRequests({ is_historic: true }),
         historicDocumentationService.getHistoricDocumentation(),
-        campusService.getCampuses(),
+        propertyService.getProperties(),
       ]);
       setWorkRequests(wrData);
       setDocs(docData);
-      setCampuses(campusData);
+      setProperties(propertyData);
       if (!selectedId && wrData.length > 0) {
         setSelectedId(wrData[0].id);
       }
@@ -138,7 +138,7 @@ export function HistoricDocumentationPage() {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
-          <div className="w-14 h-14 border-4 border-[#143352]/20 border-t-[#143352] rounded-full animate-spin mx-auto mb-4" />
+          <div className="w-14 h-14 border-4 border-[#0f2749]/20 border-t-[#0f2749] rounded-full animate-spin mx-auto mb-4" />
           <p className="text-neutral-600">Loading historic documentation…</p>
         </div>
       </div>
@@ -148,7 +148,7 @@ export function HistoricDocumentationPage() {
   return (
     <div className="space-y-8">
       {/* Hero */}
-      <div className="rounded-3xl bg-[#143352] text-white p-8 shadow-lg">
+      <div className="rounded-3xl bg-[#0f2749] text-white p-8 shadow-lg">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <p className="text-xs uppercase tracking-[0.35em] text-white/60 mb-4">Historic Stewardship</p>
@@ -162,7 +162,7 @@ export function HistoricDocumentationPage() {
             <p className="text-xs font-semibold tracking-wide text-white/70">Historic Work Requests</p>
             <p className="text-4xl font-heading font-semibold">{workRequests.length}</p>
             <p className="text-sm text-white/70">
-              {workRequests.filter((wr) => wr.is_historic).length} active projects across campuses
+              {workRequests.filter((wr) => wr.is_historic).length} active projects across properties
             </p>
           </div>
         </div>
@@ -174,7 +174,7 @@ export function HistoricDocumentationPage() {
         <div className="space-y-6 xl:col-span-1">
           <div className="card p-6 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-white text-[#143352] border border-[#143352]/20 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-white text-[#0f2749] border border-[#0f2749]/20 flex items-center justify-center">
                 <Feather className="w-5 h-5" />
               </div>
               <div>
@@ -188,7 +188,7 @@ export function HistoricDocumentationPage() {
               <select
                 value={selectedId}
                 onChange={(e) => setSelectedId(e.target.value)}
-                className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#143352]"
+                className="w-full px-4 py-2 border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#0f2749]"
               >
                 {workRequests.length === 0 && <option value="">No historic requests available</option>}
                 {workRequests.map((wr) => (
@@ -209,12 +209,12 @@ export function HistoricDocumentationPage() {
               <div className="border border-neutral-200 rounded-2xl p-4 bg-neutral-50">
                 <div className="flex items-center justify-between mb-3">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-neutral-500">Campus</p>
+                    <p className="text-xs uppercase tracking-wide text-neutral-500">Property</p>
                     <p className="text-lg font-heading font-semibold text-neutral-900">
-                      {campuses.find((c) => c.id === selectedRequest.campus_id)?.name || 'Campus'}
+                      {properties.find((c) => c.id === selectedRequest.property_id)?.name || 'Property'}
                     </p>
                   </div>
-                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#143352]/10 text-[#143352]">
+                  <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#0f2749]/10 text-[#0f2749]">
                       {selectedRequest.priority} Priority
                   </span>
                 </div>
@@ -229,7 +229,7 @@ export function HistoricDocumentationPage() {
 
           <div className="card p-6 space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-[#143352]/10 text-[#143352] flex items-center justify-center">
+              <div className="w-10 h-10 rounded-full bg-[#0f2749]/10 text-[#0f2749] flex items-center justify-center">
                 <BookOpen className="w-5 h-5" />
               </div>
               <div>
@@ -261,7 +261,7 @@ export function HistoricDocumentationPage() {
         {/* Form */}
         <div className="card p-6 space-y-6 xl:col-span-2">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-[#143352]/10 text-[#143352] flex items-center justify-center">
+            <div className="w-10 h-10 rounded-full bg-[#0f2749]/10 text-[#0f2749] flex items-center justify-center">
               <PenSquare className="w-5 h-5" />
             </div>
             <div>
@@ -282,7 +282,7 @@ export function HistoricDocumentationPage() {
                   }}
                   rows={5}
                   placeholder="Document lumber species, fasteners, finishes, hardware—down to nail types."
-                  className={`w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#143352] ${
+                  className={`w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0f2749] ${
                     errors.materials_used ? 'border-red-300' : 'border-neutral-200'
                   }`}
                 />
@@ -303,7 +303,7 @@ export function HistoricDocumentationPage() {
                   }}
                   rows={5}
                   placeholder="Describe installation techniques, preservation methods, and sequence of work."
-                  className={`w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#143352] ${
+                  className={`w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0f2749] ${
                     errors.methods_applied ? 'border-red-300' : 'border-neutral-200'
                   }`}
                 />
@@ -327,7 +327,7 @@ export function HistoricDocumentationPage() {
                   }}
                   rows={4}
                   placeholder="Summarize directives from architects or preservation boards."
-                  className={`w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#143352] ${
+                  className={`w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0f2749] ${
                     errors.architect_guidance ? 'border-red-300' : 'border-neutral-200'
                   }`}
                 />
@@ -348,7 +348,7 @@ export function HistoricDocumentationPage() {
                   }}
                   rows={4}
                   placeholder="Document inspections, SHPO approvals, tax credit requirements, or permit notes."
-                  className={`w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#143352] ${
+                  className={`w-full px-4 py-3 border rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0f2749] ${
                     errors.compliance_notes ? 'border-red-300' : 'border-neutral-200'
                   }`}
                 />
@@ -368,7 +368,7 @@ export function HistoricDocumentationPage() {
                 onChange={(e) => setFormData({ ...formData, photo_urls: e.target.value })}
                 rows={3}
                 placeholder="https://photo1.jpg, https://detail-shot.png"
-                className="w-full px-4 py-3 border border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#143352]"
+                className="w-full px-4 py-3 border border-neutral-200 rounded-2xl focus:outline-none focus:ring-2 focus:ring-[#0f2749]"
               />
               <p className="text-xs text-neutral-500 mt-1 flex items-center gap-1">
                 <Camera className="w-4 h-4" /> Separate multiple URLs with commas.
@@ -379,7 +379,7 @@ export function HistoricDocumentationPage() {
               <button
                 type="submit"
                 disabled={isSaving}
-                className="flex-1 min-w-[220px] bg-[#143352] hover:bg-[#0f2542] text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
+                className="flex-1 min-w-[220px] bg-[#0f2749] hover:bg-[#0f2542] text-white font-semibold py-3 rounded-2xl flex items-center justify-center gap-2 transition-colors disabled:opacity-60"
               >
                 {isSaving ? (
                   <>
@@ -395,7 +395,7 @@ export function HistoricDocumentationPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedId('')}
-                  className="min-w-[150px] border border-neutral-200 text-neutral-700 rounded-2xl px-4 py-3 font-semibold hover:text-[#143352] hover:border-[#143352] transition-colors"
+                  className="min-w-[150px] border border-neutral-200 text-neutral-700 rounded-2xl px-4 py-3 font-semibold hover:text-[#0f2749] hover:border-[#0f2749] transition-colors"
                 >
                   Clear Selection
                 </button>

@@ -1,16 +1,43 @@
 import { supabase } from './supabaseClient';
-import type { Invoice, InvoiceLineItem } from '../types';
+import type { Invoice } from '../types';
+import { mapInvoiceRow } from '../utils/supabaseMappers';
+
+const toInvoiceRow = (invoice: Partial<Invoice>) => {
+  const row: Record<string, any> = {};
+  if (invoice.invoice_number !== undefined) row.invoice_number = invoice.invoice_number;
+  if (invoice.project_id !== undefined) row.project_id = invoice.project_id;
+  if (invoice.contract_id !== undefined) row.contract_id = invoice.contract_id;
+  if (invoice.work_order_ids !== undefined) row.work_order_ids = invoice.work_order_ids;
+  if (invoice.property_id !== undefined) row.property_id = invoice.property_id;
+  if (invoice.funding_code !== undefined) row.funding_source = invoice.funding_code;
+  if (invoice.prime_vendor_id !== undefined) row.prime_vendor_id = invoice.prime_vendor_id;
+  if (invoice.billing_reference_id !== undefined) row.billing_reference_id = invoice.billing_reference_id;
+  if (invoice.line_items !== undefined) row.line_items = invoice.line_items;
+  if (invoice.total_amount !== undefined) row.total_amount = invoice.total_amount;
+  if (invoice.retainage_withheld !== undefined) row.retainage_withheld = invoice.retainage_withheld;
+  if (invoice.retainage_released !== undefined) row.retainage_released = invoice.retainage_released;
+  if (invoice.gross_margin_snapshot !== undefined) row.gross_margin_snapshot = invoice.gross_margin_snapshot;
+  if (invoice.status !== undefined) row.status = invoice.status;
+  if (invoice.payment_method !== undefined) row.payment_method = invoice.payment_method;
+  if (invoice.payment_reference !== undefined) row.payment_reference = invoice.payment_reference;
+  if (invoice.submitted_at !== undefined) row.submitted_at = invoice.submitted_at;
+  if (invoice.approved_at !== undefined) row.approved_at = invoice.approved_at;
+  if (invoice.approved_by_id !== undefined) row.approved_by = invoice.approved_by_id;
+  if (invoice.paid_at !== undefined) row.paid_at = invoice.paid_at;
+  if (invoice.notes !== undefined) row.notes = invoice.notes;
+  return row;
+};
 
 export const invoiceService = {
   // Get invoices
   async getInvoices(filters?: {
-    campus_id?: string;
+    property_id?: string;
     status?: string;
   }) {
     let query = supabase.from('invoices').select('*');
 
-    if (filters?.campus_id) {
-      query = query.eq('campus_id', filters.campus_id);
+    if (filters?.property_id) {
+      query = query.eq('property_id', filters.property_id);
     }
     if (filters?.status) {
       query = query.eq('status', filters.status);
@@ -18,7 +45,7 @@ export const invoiceService = {
 
     const { data, error } = await query.order('created_at', { ascending: false });
     if (error) throw error;
-    return data;
+    return (data ?? []).map(mapInvoiceRow);
   },
 
   // Get single invoice
@@ -29,213 +56,69 @@ export const invoiceService = {
       .eq('id', id)
       .single();
     if (error) throw error;
-    return data;
+    return mapInvoiceRow(data);
   },
 
   // Create invoice
-  async createInvoice(invoice: Invoice) {
+  async create(invoice: Partial<Invoice>) {
+    const row = toInvoiceRow(invoice);
     const { data, error } = await supabase
       .from('invoices')
-      .insert([invoice])
+      .insert([row])
       .select()
       .single();
     if (error) throw error;
-    return data;
+    return mapInvoiceRow(data);
   },
 
   // Update invoice
-  async updateInvoice(id: string, updates: Partial<Invoice>) {
+  async update(id: string, updates: Partial<Invoice>) {
+    const row = toInvoiceRow(updates);
     const { data, error } = await supabase
       .from('invoices')
-      .update(updates)
+      .update(row)
       .eq('id', id)
       .select()
       .single();
     if (error) throw error;
-    return data;
+    return mapInvoiceRow(data);
   },
 
-  // Save invoice as draft
-  async saveDraft(invoice: Invoice) {
-    const { data, error } = await supabase
-      .from('invoices')
-      .insert([{ ...invoice, status: 'Draft' }])
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  // Calculate total from line items
+  calculateTotal(lineItems: { amount: number }[]): number {
+    return lineItems.reduce((sum, item) => sum + (item.amount || 0), 0);
   },
 
-  // Submit invoice
-  async submitInvoice(id: string) {
-    const { data, error } = await supabase
-      .from('invoices')
-      .update({
-        status: 'Submitted',
-        submitted_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  // Validate invoice fields
+  validateInvoice(invoice: Partial<Invoice>): { valid: boolean; errors: Record<string, string> } {
+    const errors: Record<string, string> = {};
+    if (!invoice.property_id) errors.property_id = 'Property is required';
+    if (!invoice.line_items || invoice.line_items.length === 0) errors.line_items = 'At least one line item is required';
+    return { valid: Object.keys(errors).length === 0, errors };
   },
 
-  // Approve invoice
-  async approveInvoice(id: string, approvedBy: string) {
-    const { data, error } = await supabase
-      .from('invoices')
-      .update({
-        status: 'Approved',
-        approved_by: approvedBy,
-        approved_at: new Date().toISOString(),
-      })
-      .eq('id', id)
-      .select()
-      .single();
-    if (error) throw error;
-    return data;
+  // Create multiple invoices split by property
+  async createSplitInvoices(invoices: Partial<Invoice>[]): Promise<Invoice[]> {
+    return Promise.all(invoices.map((inv) => this.create(inv)));
   },
 
-  // Mark as paid
-  async markAsPaid(id: string, paymentMethod?: string) {
+  // Process payment
+  async processPayment(id: string, paymentDetails: {
+    method: string;
+    reference: string;
+  }) {
     const { data, error } = await supabase
       .from('invoices')
       .update({
         status: 'Paid',
+        payment_method: paymentDetails.method,
+        payment_reference: paymentDetails.reference,
         paid_at: new Date().toISOString(),
-        payment_method: paymentMethod,
       })
       .eq('id', id)
       .select()
       .single();
     if (error) throw error;
-    return data;
+    return mapInvoiceRow(data);
   },
-
-  // Get invoices pending payment
-  async getPendingInvoices() {
-    const { data, error } = await supabase
-      .from('invoices')
-      .select('*')
-      .in('status', ['Submitted', 'Approved'])
-      .order('submitted_at', { ascending: true });
-    if (error) throw error;
-    return data;
-  },
-
-  // Split invoices by campus
-  async createSplitInvoices(campusInvoiceMap: Map<string, Invoice>) {
-    const invoices: Invoice[] = [];
-
-    for (const [_campusId, invoice] of campusInvoiceMap) {
-      const created = await this.createInvoice(invoice);
-      invoices.push(created);
-    }
-
-    return invoices;
-  },
-
-  // Calculate total
-  calculateTotal(lineItems: InvoiceLineItem[]): number {
-    return lineItems.reduce((sum, item) => sum + item.amount, 0);
-  },
-
-   // Validate invoice with ENHANCED requirements
-   validateInvoice(invoice: Invoice): { valid: boolean; errors: string[] } {
-     const errors: string[] = [];
-
-     if (!invoice.campus_id) {
-       errors.push('Campus is required');
-     }
-     if (!invoice.funding_source || invoice.funding_source.trim() === '') {
-       errors.push('Funding source is required');
-     }
-     if (!invoice.line_items || invoice.line_items.length === 0) {
-       errors.push('At least one line item is required');
-     }
-     if (invoice.total_amount <= 0) {
-       errors.push('Total amount must be greater than 0');
-     }
-
-     // Enhanced validation: check for detailed work description
-    invoice.line_items?.forEach((item, index) => {
-      if (!item.description || item.description.trim() === '') {
-        errors.push(`Line item ${index + 1}: Description is required`);
-      }
-      if (!item.location || item.location.trim() === '') {
-        errors.push(`Line item ${index + 1}: Location is required`);
-      }
-      if (!item.work_performed_notes || item.work_performed_notes.trim() === '') {
-        errors.push(`Line item ${index + 1}: Work performed notes are REQUIRED (describe what work was actually done)`);
-      }
-       if (!item.amount || item.amount <= 0) {
-         errors.push(`Line item ${index + 1}: Amount must be greater than 0`);
-       }
-       if (!item.rate || item.rate <= 0) {
-         errors.push(`Line item ${index + 1}: Rate must be greater than 0`);
-       }
-     });
-
-     return {
-       valid: errors.length === 0,
-       errors,
-     };
-   },
-
-   // Get invoices by date range
-   async getInvoicesByDateRange(startDate: Date, endDate: Date) {
-     const { data, error } = await supabase
-       .from('invoices')
-       .select('*')
-       .gte('created_at', startDate.toISOString())
-       .lte('created_at', endDate.toISOString())
-       .order('created_at', { ascending: false });
-     if (error) throw error;
-     return data;
-   },
-
-   // Get invoices by campus
-   async getInvoicesByCampus(campusId: string, filters?: {
-     status?: string;
-     dateRange?: { start: Date; end: Date };
-   }) {
-     let query = supabase
-       .from('invoices')
-       .select('*')
-       .eq('campus_id', campusId);
-
-     if (filters?.status) {
-       query = query.eq('status', filters.status);
-     }
-
-     if (filters?.dateRange) {
-       query = query
-         .gte('created_at', filters.dateRange.start.toISOString())
-         .lte('created_at', filters.dateRange.end.toISOString());
-     }
-
-     const { data, error } = await query.order('created_at', { ascending: false });
-     if (error) throw error;
-     return data;
-   },
-
-   // Calculate total with detailed breakdown
-   calculateTotalWithBreakdown(lineItems: InvoiceLineItem[]): {
-     subtotal: number;
-     itemCount: number;
-     details: Array<{ description: string; amount: number }>;
-   } {
-     const subtotal = lineItems.reduce((sum, item) => sum + item.amount, 0);
-     const details = lineItems.map(item => ({
-       description: item.description,
-       amount: item.amount,
-     }));
-
-     return {
-       subtotal,
-       itemCount: lineItems.length,
-       details,
-     };
-   },
 };

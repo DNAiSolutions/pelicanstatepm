@@ -1,292 +1,180 @@
-import {
-  mockLeads,
-  mockProjects,
-  mockContacts,
-  mockLeadIntakeRecords,
-  type Lead,
-  type Project,
-  type Contact,
-  type IntakeChannel,
-  type LeadSource,
-  type Priority,
-  type LeadIntakeRecord,
-  getLeadById,
-  getLeads,
-} from '../data/pipeline';
-import { intakeDecisionService } from './intakeDecisionService';
-import { walkthroughSchedulerService } from './walkthroughSchedulerService';
-import { walkthroughSessionService } from './walkthroughSessionService';
+import { supabase } from './supabaseClient';
+import type { Lead, IntakeChannel, Priority } from '../types';
+import { mapLeadRow } from '../utils/supabaseMappers';
 
-const id = (prefix: string) => `${prefix}-${Math.random().toString(36).slice(2, 8)}-${Date.now().toString(36)}`;
-
-function cloneLead(lead: Lead): Lead {
-  return JSON.parse(JSON.stringify(lead));
-}
-
-const channelToSource: Record<IntakeChannel, LeadSource> = {
-  ClientPortal: 'Client Portal',
-  Phone: 'Inbound',
-  Internal: 'Inbound',
-  Email: 'Inbound',
-  WebForm: 'Inbound',
-};
-
-function normalizePhone(phone: string) {
-  return phone.replace(/[^0-9]/g, '');
-}
-
-function findContactByEmailOrPhone(email: string, phone: string): Contact | undefined {
-  const normalizedPhone = normalizePhone(phone);
-  return mockContacts.find((contact) => {
-    if (email && contact.email.toLowerCase() === email.toLowerCase()) return true;
-    if (normalizedPhone && normalizePhone(contact.phone) === normalizedPhone) return true;
-    return false;
-  });
-}
-
-export type LeadIntakeFormInput = {
+export interface LeadIntakeFormInput {
   companyName: string;
   contactName: string;
   email: string;
   phone: string;
-  campusId?: string;
+  propertyId: string;
   projectId?: string;
   issueSummary: string;
-  jobAddress?: string;
-  urgency?: Priority;
-  accessNotes?: string;
-  attachments?: string[];
+  jobAddress: string;
+  urgency: Priority;
+  accessNotes: string;
+  attachments: string[];
   intakeChannel: IntakeChannel;
-  estimatedValue?: number;
+  estimatedValue: number;
+  notes: string;
   recordedById?: string;
-  notes?: string;
-  preferredChannel?: 'Email' | 'Phone' | 'Text';
-  callSource?: string;
-  handledBy?: string;
-  submissionSource?: 'Web' | 'Internal';
+  preferredChannel: 'Email' | 'Phone' | 'Text';
+  callSource: string;
+  handledBy: string;
+  submissionSource: 'Web' | 'Internal';
+}
+
+const toLeadRow = (lead: Partial<Lead>) => {
+  const row: Record<string, any> = {};
+  if (lead.company_name !== undefined) row.company_name = lead.company_name;
+  if (lead.contact_name !== undefined) row.contact_name = lead.contact_name;
+  if (lead.email !== undefined) row.email = lead.email;
+  if (lead.phone !== undefined) row.phone = lead.phone;
+  if (lead.stage !== undefined) row.stage = lead.stage;
+  if (lead.source !== undefined) row.source = lead.source;
+  if (lead.estimated_value !== undefined) row.estimated_value = lead.estimated_value;
+  if (lead.next_step !== undefined) row.next_step = lead.next_step;
+  if (lead.notes !== undefined) row.notes = lead.notes;
+  if (lead.property_id !== undefined) row.property_id = lead.property_id;
+  if (lead.project_id !== undefined) row.project_id = lead.project_id;
+  if (lead.intake_metadata !== undefined) row.intake_metadata = lead.intake_metadata;
+  if (lead.intake_channel !== undefined) row.intake_channel = lead.intake_channel;
+  if (lead.recommended_next_step !== undefined) row.recommended_next_step = lead.recommended_next_step;
+  if (lead.decision_confidence !== undefined) row.decision_confidence = lead.decision_confidence;
+  if (lead.decision_notes !== undefined) row.decision_notes = lead.decision_notes;
+  if (lead.job_address !== undefined) row.job_address = lead.job_address;
+  if (lead.urgency !== undefined) row.urgency = lead.urgency;
+  if (lead.access_notes !== undefined) row.access_notes = lead.access_notes;
+  if (lead.attachments !== undefined) row.attachments = lead.attachments;
+  if (lead.follow_up_status !== undefined) row.follow_up_status = lead.follow_up_status;
+  if (lead.preferred_channel !== undefined) row.preferred_channel = lead.preferred_channel;
+  if (lead.call_source !== undefined) row.call_source = lead.call_source;
+  if (lead.handled_by !== undefined) row.handled_by = lead.handled_by;
+  if (lead.walkthrough_scheduled !== undefined) row.walkthrough_scheduled = lead.walkthrough_scheduled;
+  if (lead.walkthrough_date !== undefined) row.walkthrough_date = lead.walkthrough_date;
+  if (lead.walkthrough_event_id !== undefined) row.walkthrough_event_id = lead.walkthrough_event_id;
+  if (lead.walkthrough_notes !== undefined) row.walkthrough_notes = lead.walkthrough_notes;
+  if (lead.project_type !== undefined) row.project_type = lead.project_type;
+  if (lead.walkthrough_prep_brief !== undefined) row.walkthrough_prep_brief = lead.walkthrough_prep_brief;
+  if (lead.walkthrough_session_ids !== undefined) row.walkthrough_session_ids = lead.walkthrough_session_ids;
+  if (lead.walkthrough_plan !== undefined) row.walkthrough_plan = lead.walkthrough_plan;
+  return row;
 };
 
 export const leadService = {
   async list(): Promise<Lead[]> {
-    return getLeads().map(cloneLead);
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*, contact_leads(contact_id)')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    return (data || []).map(mapLeadRow);
   },
 
   async getById(id: string): Promise<Lead | undefined> {
-    const lead = getLeadById(id);
-    return lead ? cloneLead(lead) : undefined;
+    const { data, error } = await supabase
+      .from('leads')
+      .select('*, contact_leads(contact_id)')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (error) throw error;
+    return data ? mapLeadRow(data) : undefined;
   },
 
-  async create(payload: Omit<Lead, 'id' | 'createdAt' | 'updatedAt'>): Promise<Lead> {
-    const newLead: Lead = {
-      ...payload,
-      id: `lead-${Date.now()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
-    mockLeads.push(newLead);
-    return cloneLead(newLead);
+  async create(lead: Partial<Lead>): Promise<Lead> {
+    const row = toLeadRow(lead);
+    const { data, error } = await supabase
+      .from('leads')
+      .insert([row])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapLeadRow(data);
+  },
+
+  async update(id: string, updates: Partial<Lead>): Promise<Lead> {
+    const row = toLeadRow(updates);
+    const { data, error } = await supabase
+      .from('leads')
+      .update(row)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapLeadRow(data);
   },
 
   async delete(id: string): Promise<void> {
-    const index = mockLeads.findIndex((lead) => lead.id === id);
-    if (index === -1) return;
-    mockLeads.splice(index, 1);
-    mockContacts.forEach((contact) => {
-      contact.leadIds = contact.leadIds.filter((leadId) => leadId !== id);
-    });
-    for (let i = mockLeadIntakeRecords.length - 1; i >= 0; i -= 1) {
-      if (mockLeadIntakeRecords[i].leadId === id) {
-        mockLeadIntakeRecords.splice(i, 1);
-      }
-    }
+    const { error } = await supabase.from('leads').delete().eq('id', id);
+    if (error) throw error;
   },
 
-  async createFromIntake(form: LeadIntakeFormInput): Promise<Lead> {
-    const existingContact = findContactByEmailOrPhone(form.email, form.phone);
-    let contactId = existingContact?.id;
-    if (!existingContact) {
-      const newContact: Contact = {
-        id: id('contact'),
-        name: form.contactName,
-        title: 'Client Contact',
-        company: form.companyName,
-        type: 'Client',
-        email: form.email,
-        phone: form.phone,
-        campusId: form.campusId,
-        projectIds: form.projectId ? [form.projectId] : [],
-        leadIds: [],
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        notes: form.accessNotes,
-        preferredChannel: form.preferredChannel,
-      };
-      mockContacts.push(newContact);
-      contactId = newContact.id;
-    }
-    if (existingContact) {
-      existingContact.preferredChannel = form.preferredChannel || existingContact.preferredChannel;
-      existingContact.notes = form.accessNotes || existingContact.notes;
-      existingContact.updatedAt = new Date().toISOString();
-    }
-
-    const decision = intakeDecisionService.evaluate({ issueSummary: form.issueSummary, urgency: form.urgency, intakeChannel: form.intakeChannel, accessNotes: form.accessNotes });
-    const newLead: Lead = {
-      id: id('lead'),
-      companyName: form.companyName,
-      contactName: form.contactName,
-      email: form.email,
-      phone: form.phone,
-      stage: 'New',
-      source: channelToSource[form.intakeChannel],
-      estimatedValue: form.estimatedValue ?? 25000,
-      nextStep: decision.rationale,
-      notes: form.notes,
-      campusId: form.campusId,
-      projectId: form.projectId,
-      contactIds: contactId ? [contactId] : [],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      intakeChannel: form.intakeChannel,
-      recommendedNextStep: decision.nextStep,
-      decisionConfidence: decision.confidence,
-      decisionNotes: decision.rationale,
-      jobAddress: form.jobAddress,
-      urgency: form.urgency,
-      accessNotes: form.accessNotes,
-      attachments: form.attachments,
-      followUpStatus: 'Pending',
-      preferredChannel: form.preferredChannel,
-      callSource: form.callSource,
-      handledBy: form.handledBy,
-      projectType: decision.projectType,
-      walkthroughPrepBrief: decision.prepBrief,
-      walkthroughSessionIds: [],
-      walkthroughPlan: undefined,
-      intakeMetadata: {
-        issueSummary: form.issueSummary,
-        jobAddress: form.jobAddress,
-        urgency: form.urgency,
-        accessNotes: form.accessNotes,
-        attachments: form.attachments,
-        intakeChannel: form.intakeChannel,
-        recordedById: form.recordedById,
-        recommendedNextStep: decision.nextStep,
-        decisionConfidence: decision.confidence,
-        decisionNotes: decision.rationale,
-        walkthroughNeeded: decision.requiresWalkthrough,
-        nextStepStatus: 'Pending',
-        submittedBy: form.contactName,
-        preferredChannel: form.preferredChannel,
-        callSource: form.callSource,
-        handledBy: form.handledBy,
-        projectType: decision.projectType,
-        submissionSource: form.submissionSource,
-      },
-    };
-
-    mockLeads.push(newLead);
-    if (contactId) {
-      const contact = mockContacts.find((c) => c.id === contactId);
-      if (contact && !contact.leadIds.includes(newLead.id)) {
-        contact.leadIds.push(newLead.id);
-        contact.updatedAt = new Date().toISOString();
-      }
-    }
-
-    const intakeRecord: LeadIntakeRecord = {
-      id: id('intake'),
-      leadId: newLead.id,
-      capturedAt: new Date().toISOString(),
-      formSnapshot: {
-        companyName: form.companyName,
-        contactName: form.contactName,
-        email: form.email,
-        phone: form.phone,
-        campusId: form.campusId,
-        issueSummary: form.issueSummary,
-        jobAddress: form.jobAddress,
-        urgency: form.urgency,
-        accessNotes: form.accessNotes,
-        attachments: form.attachments,
-        intakeChannel: form.intakeChannel,
-      },
-      decision: {
-        nextStep: decision.nextStep,
-        confidence: decision.confidence,
-        rationale: decision.rationale,
-      },
-    };
-    mockLeadIntakeRecords.push(intakeRecord);
-
-    return cloneLead(newLead);
+  async linkContact(leadId: string, contactId: string): Promise<void> {
+    const { error } = await supabase
+      .from('contact_leads')
+      .insert({ lead_id: leadId, contact_id: contactId });
+    if (error) throw error;
   },
 
-  async update(id: string, updates: Partial<Lead>): Promise<Lead | undefined> {
-    const lead = getLeadById(id);
-    if (!lead) return undefined;
-    Object.assign(lead, updates, { updatedAt: new Date().toISOString() });
-    return cloneLead(lead);
+  async createFromIntake(input: LeadIntakeFormInput): Promise<Lead> {
+    const { data, error } = await supabase
+      .from('leads')
+      .insert([{
+        company_name: input.companyName,
+        contact_name: input.contactName,
+        email: input.email,
+        phone: input.phone,
+        property_id: input.propertyId,
+        project_id: input.projectId,
+        intake_channel: input.intakeChannel,
+        estimated_value: input.estimatedValue,
+        notes: input.notes,
+        urgency: input.urgency,
+        job_address: input.jobAddress,
+        access_notes: input.accessNotes,
+        attachments: input.attachments,
+        preferred_channel: input.preferredChannel,
+        call_source: input.callSource,
+        handled_by: input.handledBy,
+        stage: 'New',
+        source: input.submissionSource === 'Web' ? 'Client Portal' : 'Inbound'
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+    return mapLeadRow(data);
   },
 
-  async convertToProject(id: string): Promise<Project | undefined> {
-    const lead = getLeadById(id);
-    if (!lead) return undefined;
+  async scheduleWalkthrough(id: string, options: { date: string; notes?: string }): Promise<Lead> {
+    const { data, error } = await supabase
+      .from('leads')
+      .update({
+        walkthrough_scheduled: true,
+        walkthrough_date: options.date,
+        walkthrough_notes: options.notes,
+        stage: 'Walkthrough'
+      })
+      .eq('id', id)
+      .select()
+      .single();
 
-    const project: Project = {
-      id: `proj-from-lead-${Date.now()}`,
-      name: `${lead.companyName} Project`,
-      siteId: lead.campusId ? `site-from-${lead.campusId}` : mockProjects[0]?.siteId || 'site-1',
-      campusId: lead.campusId,
-      clientName: lead.companyName,
-      clientPhone: lead.phone,
-      clientEmail: lead.email,
-      internalOwnerId: mockProjects[0]?.internalOwnerId || 'user-1',
-      primeVendorId: mockProjects[0]?.primeVendorId,
-      status: 'Planning',
-      clientVisibility: { showBudget: true, showTimeline: true, showInvoices: true, showContacts: true },
-      startDate: new Date().toISOString(),
-      endDate: new Date(Date.now() + 90 * 24 * 60 * 60 * 1000).toISOString(),
-      totalBudget: lead.estimatedValue,
-      spentBudget: 0,
-      clientSummary: lead.notes,
-      internalNotes: 'Converted from lead',
-      shareToken: `share-${Date.now().toString(36)}`,
-      clientLogo: undefined,
-    };
-
-    mockProjects.push(project);
-    lead.stage = 'Won';
-    lead.projectId = project.id;
-    lead.updatedAt = new Date().toISOString();
-    lead.notes = `${lead.notes || ''}\nConverted to project ${project.name}`.trim();
-
-    if (lead.contactIds.length) {
-      lead.contactIds.forEach((contactId) => {
-        const contact = mockContacts.find((c) => c.id === contactId);
-        if (contact && !contact.projectIds.includes(project.id)) {
-          contact.projectIds.push(project.id);
-        }
-      });
-    }
-
-    return JSON.parse(JSON.stringify(project));
+    if (error) throw error;
+    return mapLeadRow(data);
   },
 
-  async scheduleWalkthrough(id: string, params: { date: string; notes?: string }): Promise<Lead | undefined> {
-    const lead = getLeadById(id);
-    if (!lead) return undefined;
-    const event = await walkthroughSchedulerService.schedule(lead, params);
-    lead.walkthroughScheduled = true;
-    lead.walkthroughDate = params.date;
-    lead.walkthroughEventId = event.eventId;
-    lead.walkthroughNotes = params.notes;
-    lead.stage = 'Walkthrough';
-    const session = walkthroughSessionService.createFromLead(id, { date: params.date, notes: params.notes });
-    lead.walkthroughSessionIds = [...(lead.walkthroughSessionIds || []), session.id];
-    lead.updatedAt = new Date().toISOString();
-    return cloneLead(lead);
-  },
+  async listIntakeHistory(leadId: string): Promise<any[]> {
+    const { data, error } = await supabase
+      .from('lead_intake_history')
+      .select('*')
+      .eq('lead_id', leadId)
+      .order('captured_at', { ascending: false });
+
+    if (error) return [];
+    return data || [];
+  }
 };
-
-export type LeadService = typeof leadService;

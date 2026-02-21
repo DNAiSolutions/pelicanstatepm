@@ -1,11 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import {
-  type Contact,
-  type Lead,
-  type Project,
-  type WorkOrder,
-} from '../data/pipeline';
+import type { Contact, Lead, Project } from '../types';
+import type { WorkOrder } from '../data/pipeline';
 import { projectService } from '../services/projectService';
 import { projectTaskService } from '../services/projectTaskService';
 import toast from 'react-hot-toast';
@@ -44,10 +40,10 @@ export function ProjectDetailPageRefactored() {
           setProject(proj);
         }
 
-        const projLeads = await projectService.getProjectLeads(projectId);
+        const projLeads = await projectService.getRelatedLeads(projectId);
         setLeads(projLeads);
 
-        const projContacts = await projectService.getProjectContacts(projectId);
+        const projContacts = await projectService.getContacts(projectId);
         setContacts(projContacts);
 
         const projTasks = projectTaskService.getByProject(projectId);
@@ -85,7 +81,7 @@ export function ProjectDetailPageRefactored() {
 
   const handleLeadClick = (lead: Lead) => {
     // TODO: Navigate to lead detail or open modal
-    toast.success(`Clicked lead: ${lead.companyName}`);
+    toast.success(`Clicked lead: ${lead.company_name}`);
   };
 
   const handleContactClick = (contact: Contact) => {
@@ -101,7 +97,7 @@ export function ProjectDetailPageRefactored() {
   if (loading || !project) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 border-4 border-[#143352]/20 border-t-[#143352] rounded-full animate-spin" />
+        <div className="w-10 h-10 border-4 border-[#0f2749]/20 border-t-[#0f2749] rounded-full animate-spin" />
       </div>
     );
   }
@@ -125,7 +121,7 @@ export function ProjectDetailPageRefactored() {
                 onClick={() => setActiveTab(tab)}
                 className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap ${
                   activeTab === tab
-                    ? 'border-[#143352] text-[#143352]'
+                    ? 'border-[#0f2749] text-[#0f2749]'
                     : 'border-transparent text-neutral-600 hover:text-neutral-900'
                 }`}
               >

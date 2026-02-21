@@ -82,7 +82,7 @@ export function DashboardPageRefactored() {
       {/* Metrics */}
       <DashboardMetrics metrics={metrics} />
 
-      {/* Featured Project + Campus Overview */}
+      {/* Featured Project + Property Overview */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {featuredProject && (
           <DashboardFeaturedProject
@@ -92,43 +92,43 @@ export function DashboardPageRefactored() {
           />
         )}
 
-        {/* Campus Overview */}
+        {/* Property Overview */}
         <div className="bg-white border border-neutral-200 p-6 rounded-lg">
-          <h2 className="text-xl font-heading font-bold text-neutral-900 mb-4">Campus Overview</h2>
+          <h2 className="text-xl font-heading font-bold text-neutral-900 mb-4">Property Overview</h2>
           <div className="space-y-3">
             {mockProjects
               .reduce(
                 (acc, p) => {
-                  const existing = acc.find((c) => c.campusId === p.campusId);
+                  const existing = acc.find((c) => c.propertyId === p.propertyId);
                   if (existing) {
                     existing.count++;
                   } else {
-                    acc.push({ campusId: p.campusId, count: 1, name: p.clientName });
+                    acc.push({ propertyId: p.propertyId, count: 1, name: p.clientName });
                   }
                   return acc;
                 },
-                [] as Array<{ campusId: string | undefined; count: number; name: string }>
+                [] as Array<{ propertyId: string | undefined; count: number; name: string }>
               )
-              .map((campus, idx) => {
-                if (!campus.campusId) return null;
-                const campusWorkOrders = mockWorkOrders.filter((wo) =>
-                  mockProjects.some((p) => p.id === wo.projectId && p.campusId === campus.campusId)
+              .map((property, idx) => {
+                if (!property.propertyId) return null;
+                const propertyWorkOrders = mockWorkOrders.filter((wo) =>
+                  mockProjects.some((p) => p.id === wo.projectId && p.propertyId === property.propertyId)
                 );
-                const activeCount = campusWorkOrders.filter((wo) =>
+                const activeCount = propertyWorkOrders.filter((wo) =>
                   ['InProgress', 'Scheduled'].includes(wo.status)
                 ).length;
 
-                const campusId = campus.campusId;
+                const propertyId = property.propertyId;
                 return (
                   <button
                     key={idx}
-                    onClick={() => campusId && navigate(`/work-requests?campus=${campusId}`)}
+                    onClick={() => propertyId && navigate(`/work-requests?property=${propertyId}`)}
                     className="w-full flex items-center justify-between p-3 bg-neutral-50 border border-neutral-200 rounded hover:bg-neutral-100 transition-colors text-left"
                   >
                     <div>
-                      <p className="font-medium text-neutral-900">{campus.name}</p>
+                      <p className="font-medium text-neutral-900">{property.name}</p>
                       <p className="text-xs text-neutral-500">
-                        {campusWorkOrders.length} work orders
+                        {propertyWorkOrders.length} work orders
                       </p>
                     </div>
                     {activeCount > 0 && (
