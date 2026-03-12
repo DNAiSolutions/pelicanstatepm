@@ -1,4 +1,5 @@
 import { useAuth } from '../context/AuthContext';
+import type { AccessType } from '../services/userProfileService';
 import { useState, useEffect } from 'react';
 import { projectService } from '../services/projectService';
 import { workRequestService } from '../services/workRequestService';
@@ -12,7 +13,9 @@ import type { Project, WorkRequest, Contact, Lead, Invoice, Property } from '../
  * Hook that returns live data from Supabase
  */
 export function useProfileData() {
-  const { user } = useAuth();
+  const { user, isDevelopmentProfile, accessType } = useAuth();
+  // isAdminProfile: true when user has staff access (real admin, trusted admin email, or dev profile)
+  const isAdminProfile = isDevelopmentProfile || (accessType as AccessType) === 'staff';
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState({
     projects: [] as Project[],
@@ -84,7 +87,7 @@ export function useProfileData() {
   return {
     ...data,
     loading,
-    isAdminProfile: false, // Live data — all pages load from Supabase
+    isAdminProfile,
     getProjectMetrics: (projectId: string) => {
       const projectWork = data.workOrders.filter(wo => (wo as any).project_id === projectId);
       return {

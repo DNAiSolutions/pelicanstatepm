@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './context/AuthContext';
 import { ProtectedRoute } from './components/ProtectedRoute';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { WorkRequestIntakePage } from './pages/WorkRequestIntakePage';
@@ -49,6 +50,9 @@ function AppRoutes() {
         }
       />
 
+      {/* Public token-based client view - must be outside auth wrapper */}
+      <Route path="/client/projects/:projectId/:token" element={<ProjectClientViewPage />} />
+
       {/* Protected Routes - with fallback */}
       <Route
         element={
@@ -64,7 +68,6 @@ function AppRoutes() {
         <Route path="/projects" element={<ProjectOverviewPage />} />
         <Route path="/projects/board" element={<ProjectTaskBoardPage />} />
         <Route path="/projects/:projectId" element={<ProjectDetailPage />} />
-        <Route path="/client/projects/:projectId/:token" element={<ProjectClientViewPage />} />
         <Route path="/client-portal" element={<PortalLandingPage />} />
         <Route path="/client-portal/projects" element={<PortalProjectsPage />} />
         <Route path="/client-portal/projects/:projectId" element={<PortalProjectDetailPage />} />
@@ -77,11 +80,11 @@ function AppRoutes() {
         <Route path="/work-requests/new" element={<WorkRequestIntakePage />} />
         <Route path="/work-requests/:id" element={<WorkRequestDetailPage />} />
         
-        {/* Quotes */}
+        {/* Quotes - /new must come before /:quoteId to avoid shadowing */}
         <Route path="/quotes" element={<QuotesListPage />} />
-        <Route path="/quotes/:quoteId" element={<QuoteDetailPage />} />
         <Route path="/quotes/new" element={<EstimateNewPage />} />
         <Route path="/quotes/new/:id" element={<EstimateNewPage />} />
+        <Route path="/quotes/:quoteId" element={<QuoteDetailPage />} />
         
         {/* Invoices */}
         <Route path="/invoices" element={<InvoiceListPage />} />
@@ -93,6 +96,20 @@ function AppRoutes() {
         <Route path="/historic-documentation" element={<HistoricDocumentationPage />} />
         <Route path="/schedules" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Schedules (Coming Soon)</h1></div>} />
         <Route path="/analytics" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Analytics (Coming Soon)</h1></div>} />
+        <Route path="/unauthorized" element={
+          <div className="flex items-center justify-center min-h-[70vh]">
+            <div className="text-center space-y-4">
+              <h1 className="text-2xl font-heading font-bold text-neutral-900">Access Denied</h1>
+              <p className="text-sm text-neutral-600">You don't have permission to view this page.</p>
+              <a href="/dashboard" className="inline-block px-4 py-2 bg-[#0f2749] text-white text-sm">
+                Go to Dashboard
+              </a>
+            </div>
+          </div>
+        } />
+        <Route path="/payments" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Payments (Coming Soon)</h1></div>} />
+        <Route path="/integrations" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Integrations (Coming Soon)</h1></div>} />
+        <Route path="/refer" element={<div className="p-8"><h1 className="text-3xl font-heading font-bold">Refer &amp; Earn (Coming Soon)</h1></div>} />
         <Route
           path="/members"
           element={
@@ -123,7 +140,9 @@ function App() {
   return (
     <Router>
       <AuthProvider>
-        <AppRoutes />
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
         <Toaster position="top-right" />
       </AuthProvider>
     </Router>
